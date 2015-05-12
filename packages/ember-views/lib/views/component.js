@@ -10,7 +10,6 @@ import isNone from 'ember-metal/is_none';
 
 import { computed } from "ember-metal/computed";
 import { bool } from "ember-metal/computed_macros";
-import defaultComponentLayout from "ember-htmlbars/templates/component";
 
 /**
 @module ember
@@ -118,13 +117,10 @@ var Component = View.extend(TargetActionSupport, ComponentTemplateDeprecation, {
   }),
 
   init() {
-    this._super(...arguments);
-    this._keywords.view = this;
-    set(this, 'context', this);
+    this._super.apply(this, arguments);
     set(this, 'controller', this);
+    set(this, 'context', this);
   },
-
-  defaultLayout: defaultComponentLayout,
 
   /**
   A components template property is set by passing a block
@@ -145,19 +141,18 @@ var Component = View.extend(TargetActionSupport, ComponentTemplateDeprecation, {
   @deprecated
   @property template
   */
-  template: computed({
-    get: function() {
+  template: computed('templateName', {
+    get() {
       var templateName = get(this, 'templateName');
       var template = this.templateForName(templateName, 'template');
 
       Ember.assert("You specified the templateName " + templateName + " for " + this + ", but it did not exist.", !templateName || !!template);
-
       return template || get(this, 'defaultTemplate');
     },
-    set: function(key, value) {
+    set(key, value) {
       return value;
     }
-  }).property('templateName'),
+  }),
 
   /**
   Specifying a components `templateName` is deprecated without also
@@ -168,29 +163,6 @@ var Component = View.extend(TargetActionSupport, ComponentTemplateDeprecation, {
   */
   templateName: null,
 
-  _setupKeywords() {},
-
-  _yield(context, options, morph, blockArguments) {
-    var view = options.data.view;
-    var parentView = this._parentView;
-    var template = get(this, 'template');
-
-    if (template) {
-      Ember.assert("A Component must have a parent view in order to yield.", parentView);
-
-      view.appendChild(View, {
-        isVirtual: true,
-        tagName: '',
-        template: template,
-        _blockArguments: blockArguments,
-        _contextView: parentView,
-        _morph: morph,
-        context: get(parentView, 'context'),
-        controller: get(parentView, 'controller')
-      });
-    }
-  },
-
   /**
     If the component is currently inserted into the DOM of a parent view, this
     property will point to the controller of the parent view.
@@ -199,10 +171,11 @@ var Component = View.extend(TargetActionSupport, ComponentTemplateDeprecation, {
     @type Ember.Controller
     @default null
   */
-  targetObject: computed(function(key) {
-    var parentView = this._parentView;
+  targetObject: computed('parentView', function(key) {
+    if (this._controller) { return this._controller; }
+    var parentView = get(this, 'parentView');
     return parentView ? get(parentView, 'controller') : null;
-  }).property('_parentView'),
+  }),
 
   /**
     Triggers a named action on the controller context where the component is used if
@@ -292,22 +265,26 @@ var Component = View.extend(TargetActionSupport, ComponentTemplateDeprecation, {
       actionName = get(this, 'action');
       Ember.assert("The default action was triggered on the component " + this.toString() +
                    ", but the action name (" + actionName + ") was not a string.",
-                   isNone(actionName) || typeof actionName === 'string');
+                   isNone(actionName) || typeof actionName === 'string' || typeof actionName === 'function');
     } else {
-      actionName = get(this, action);
+      actionName = get(this, 'attrs.' + action) || get(this, action);
       Ember.assert("The " + action + " action was triggered on the component " +
                    this.toString() + ", but the action name (" + actionName +
                    ") was not a string.",
-                   isNone(actionName) || typeof actionName === 'string');
+                   isNone(actionName) || typeof actionName === 'string' || typeof actionName === 'function');
     }
 
     // If no action name for that action could be found, just abort.
     if (actionName === undefined) { return; }
 
-    this.triggerAction({
-      action: actionName,
-      actionContext: contexts
-    });
+    if (typeof actionName === 'function') {
+      actionName.apply(null, contexts);
+    } else {
+      this.triggerAction({
+        action: actionName,
+        actionContext: contexts
+      });
+    }
   },
 
   send(actionName, ...args) {

@@ -17,6 +17,10 @@ Ember Debug
 @class Ember
 */
 
+function isPlainFunction(test) {
+  return typeof test === 'function' && test.PrototypeMixin === undefined;
+}
+
 /**
   Define an assertion that will throw an exception if the condition is not
   met. Ember build tools will remove any calls to `Ember.assert()` when
@@ -40,7 +44,7 @@ Ember Debug
 Ember.assert = function(desc, test) {
   var throwAssertion;
 
-  if (Ember.typeOf(test) === 'function') {
+  if (isPlainFunction(test)) {
     throwAssertion = !test();
   } else {
     throwAssertion = !test;
@@ -101,7 +105,7 @@ Ember.debug = function(message) {
 Ember.deprecate = function(message, test, options) {
   var noDeprecation;
 
-  if (typeof test === 'function') {
+  if (isPlainFunction(test)) {
     noDeprecation = test();
   } else {
     noDeprecation = test;

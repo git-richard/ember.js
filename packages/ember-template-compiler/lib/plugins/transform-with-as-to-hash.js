@@ -21,9 +21,10 @@
   @private
   @class TransformWithAsToHash
 */
-function TransformWithAsToHash() {
+function TransformWithAsToHash(options) {
   // set later within HTMLBars to the syntax package
   this.syntax = null;
+  this.options = options || {};
 }
 
 /**
@@ -34,6 +35,7 @@ function TransformWithAsToHash() {
 TransformWithAsToHash.prototype.transform = function TransformWithAsToHash_transform(ast) {
   var pluginContext = this;
   var walker = new pluginContext.syntax.Walker();
+  var moduleName = this.options.moduleName;
 
   walker.visit(ast, function(node) {
     if (pluginContext.validate(node)) {
@@ -44,12 +46,14 @@ TransformWithAsToHash.prototype.transform = function TransformWithAsToHash_trans
 
       Ember.deprecate(
         "Using {{with}} without block syntax is deprecated. " +
-        "Please use standard block form (`{{#with foo as |bar|}}`) instead.",
+        "Please use standard block form (`{{#with foo as |bar|}}`) " +
+        (moduleName ? " in `" + moduleName + "` " : "") +
+        "instead.",
         false,
         { url: "http://emberjs.com/deprecations/v1.x/#toc_code-as-code-sytnax-for-code-with-code" }
       );
 
-      var removedParams = node.sexpr.params.splice(1, 2);
+      var removedParams = node.params.splice(1, 2);
       var keyword = removedParams[1].original;
       node.program.blockParams = [keyword];
     }
@@ -60,10 +64,10 @@ TransformWithAsToHash.prototype.transform = function TransformWithAsToHash_trans
 
 TransformWithAsToHash.prototype.validate = function TransformWithAsToHash_validate(node) {
   return node.type === 'BlockStatement' &&
-    node.sexpr.path.original === 'with' &&
-    node.sexpr.params.length === 3 &&
-    node.sexpr.params[1].type === 'PathExpression' &&
-    node.sexpr.params[1].original === 'as';
+    node.path.original === 'with' &&
+    node.params.length === 3 &&
+    node.params[1].type === 'PathExpression' &&
+    node.params[1].original === 'as';
 };
 
 export default TransformWithAsToHash;

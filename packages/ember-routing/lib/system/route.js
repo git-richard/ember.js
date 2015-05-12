@@ -10,7 +10,7 @@ import merge from "ember-metal/merge";
 import {
   isArray,
   typeOf
-} from "ember-metal/utils";
+} from "ember-runtime/utils";
 import run from "ember-metal/run_loop";
 import keys from "ember-metal/keys";
 import copy from "ember-runtime/copy";
@@ -147,9 +147,6 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
         },
         allowOverrides: (controller, prop) => {
           return this._updatingQPChanged(controller, map[prop]);
-        },
-        changingKeys: (controller, prop) => {
-          return this._updateSerializedQPValue(controller, map[prop]);
         }
       }
     };
@@ -371,7 +368,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
   _reset(isExiting, transition) {
     var controller = this.controller;
 
-    controller._qpDelegate = get(this, '_qp.states.inactive');
+    controller._qpDelegate = null;
 
     this.resetController(controller, isExiting, transition);
   },
@@ -715,7 +712,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
           }
         }
 
-        controller._qpDelegate = get(this, '_qp.states.inactive');
+        controller._qpDelegate = null;
 
         var thisQueryParamChanged = (svalue !== qp.svalue);
         if (thisQueryParamChanged) {
@@ -1096,7 +1093,6 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
       if (transition) {
         // Update the model dep values used to calculate cache keys.
         stashParamNames(this.router, transition.state.handlerInfos);
-        controller._qpDelegate = states.changingKeys;
         controller._updateCacheParams(transition.params);
       }
       controller._qpDelegate = states.allowOverrides;

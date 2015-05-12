@@ -27,6 +27,12 @@ script:
 after_script:
     - ember stop-sauce-connect
 
+branches:
+  only:
+    - master
+    - beta
+    - stable
+
 env:
   global:
     - SAUCE_USERNAME=ember-ci
@@ -52,5 +58,5 @@ env:
     - TEST_SUITE=built-tests EMBER_ENV=production DISABLE_JSCS=true DISABLE_JSHINT=true
     - TEST_SUITE=old-jquery
     - TEST_SUITE=extend-prototypes
-    - TEST_SUITE=node EMBER_ENV=production DISABLE_JSCS=true DISABLE_JSHINT=true
+    - TEST_SUITE=node DISABLE_JSCS=true DISABLE_JSHINT=true
     - TEST_SUITE=sauce

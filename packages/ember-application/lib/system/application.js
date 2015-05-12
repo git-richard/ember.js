@@ -19,12 +19,11 @@ import Controller from "ember-runtime/controllers/controller";
 import EnumerableUtils from "ember-metal/enumerable_utils";
 import ObjectController from "ember-runtime/controllers/object_controller";
 import ArrayController from "ember-runtime/controllers/array_controller";
-import Renderer from "ember-views/system/renderer";
-import DOMHelper from "dom-helper";
+import Renderer from "ember-metal-views/renderer";
+import DOMHelper from "ember-htmlbars/system/dom-helper";
 import SelectView from "ember-views/views/select";
 import { OutletView } from "ember-routing-views/views/outlet";
 import EmberView from "ember-views/views/view";
-import _MetamorphView from "ember-views/views/metamorph_view";
 import EventDispatcher from "ember-views/system/event_dispatcher";
 import jQuery from "ember-views/system/jquery";
 import Route from "ember-routing/system/route";
@@ -377,6 +376,7 @@ var Application = Namespace.extend(DeferredMixin, {
     var App = Ember.Application.create();
 
     App.deferReadiness();
+
     // Ember.$ is a reference to the jQuery object/function
     Ember.$.getJSON('/auth-token', function(token) {
       App.token = token;
@@ -457,9 +457,9 @@ var Application = Namespace.extend(DeferredMixin, {
     ```javascript
     var App = Ember.Application.create();
 
-    App.Person  = Ember.Object.extend();
-    App.Orange  = Ember.Object.extend();
-    App.Email   = Ember.Object.extend();
+    App.Person = Ember.Object.extend();
+    App.Orange = Ember.Object.extend();
+    App.Email = Ember.Object.extend();
     App.session = Ember.Object.create();
 
     App.register('model:user', App.Person, { singleton: false });
@@ -759,6 +759,7 @@ var Application = Namespace.extend(DeferredMixin, {
 
   // This method must be moved to the application instance object
   willDestroy() {
+    this._super(...arguments);
     Ember.BOOTED = false;
     this._bootPromise = null;
     this._bootResolver = null;
@@ -1014,7 +1015,6 @@ Application.reopenClass({
 
     registry.injection('view', '_viewRegistry', '-view-registry:main');
 
-    registry.register('view:default', _MetamorphView);
     registry.register('view:toplevel', EmberView.extend());
 
     registry.register('route:basic', Route, { instantiate: false });

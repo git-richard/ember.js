@@ -6,12 +6,11 @@ import { Mixin } from "ember-metal/mixin";
 import { computed } from "ember-metal/computed";
 import { get } from "ember-metal/property_get";
 import { set } from "ember-metal/property_set";
+import LegacyViewSupport from "ember-views/mixins/legacy_view_support";
+import { observer } from "ember-metal/mixin";
+import { on } from "ember-metal/events";
 
-/**
-  @class ViewsContextSupport
-  @namespace Ember
-*/
-var ViewContextSupport = Mixin.create({
+var ViewContextSupport = Mixin.create(LegacyViewSupport, {
   /**
     The object from which templates should access properties.
 
@@ -25,10 +24,10 @@ var ViewContextSupport = Mixin.create({
     @type Object
   */
   context: computed({
-    get: function() {
+    get() {
       return get(this, '_context');
     },
-    set: function(key, value) {
+    set(key, value) {
       set(this, '_context', value);
       return value;
     }
@@ -53,20 +52,20 @@ var ViewContextSupport = Mixin.create({
     @private
   */
   _context: computed({
-    get: function() {
+    get() {
       var parentView, controller;
 
       if (controller = get(this, 'controller')) {
         return controller;
       }
 
-      parentView = this._parentView;
+      parentView = this.parentView;
       if (parentView) {
         return get(parentView, '_context');
       }
       return null;
     },
-    set: function(key, value) {
+    set(key, value) {
       return value;
     }
   }),
@@ -81,17 +80,25 @@ var ViewContextSupport = Mixin.create({
     @type Object
   */
   controller: computed({
-    get: function() {
+    get() {
       if (this._controller) {
         return this._controller;
       }
 
-      return this._parentView ? get(this._parentView, 'controller') : null;
+      return this.parentView ? get(this.parentView, 'controller') : null;
     },
-    set: function(_, value) {
+    set(_, value) {
       this._controller = value;
       return value;
     }
+  }),
+
+  _legacyControllerDidChange: observer('controller', function() {
+    this.walkChildViews(view => view.notifyPropertyChange('controller'));
+  }),
+
+  _notifyControllerChange: on('parentViewDidChange', function() {
+    this.notifyPropertyChange('controller');
   })
 });
 
