@@ -4,6 +4,7 @@
 
 + [Objects](#objects)
 + [Array](#arrays)
++ [Strings](#strings)
 + [Variables](#variables)
 + [Whitespace](#whitespace)
 + [Commas](#commas)
@@ -52,6 +53,10 @@ var foo = new Array(16);
 var foo = [];
 foo.push('bar');
 ```
+
+## Strings
+
++ Use `'single quotes'`.
 
 ## Variables
 
@@ -114,6 +119,21 @@ function foo() {
 }
 
 foo();
+```
+
++ Spaces are required around binary operators.
+
+```javascript
+// assignments
+var foo = bar + 'a';
+
+// conditionals
+if (foo === 'bara') {
+}
+
+// parameters
+function(test, foo) {
+}
 ```
 
 ## Commas
@@ -356,14 +376,13 @@ var [
 var person = {
   firstName: 'Stefan',
   lastName: 'Penner'
-}
+};
 
 var {
   firstName,
   lastName
 } = person;
 ```
-
 
 ## Comments
 

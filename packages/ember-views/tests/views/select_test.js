@@ -6,12 +6,17 @@ import jQuery from 'ember-views/system/jquery';
 import EventDispatcher from 'ember-views/system/event_dispatcher';
 import SafeString from 'htmlbars-util/safe-string';
 
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
 var trim = jQuery.trim;
 
 var dispatcher, select;
+var originalViewKeyword;
 
-QUnit.module('Ember.Select', {
+QUnit.module('Ember.Select [LEGACY]', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     dispatcher = EventDispatcher.create();
     dispatcher.setup();
     select = EmberSelect.create();
@@ -22,6 +27,7 @@ QUnit.module('Ember.Select', {
       dispatcher.destroy();
       select.destroy();
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -34,12 +40,6 @@ function append() {
 function selectedOptions() {
   return select.get('childViews').mapBy('selected');
 }
-
-QUnit.test('using the Ember.Select global is deprecated', function(assert) {
-  expectDeprecation(function() {
-    Ember.Select.create();
-  }, /Ember.Select is deprecated./);
-});
 
 QUnit.test('has \'ember-view\' and \'ember-select\' CSS classes', function() {
   deepEqual(select.get('classNames'), ['ember-view', 'ember-select']);
@@ -572,7 +572,6 @@ QUnit.test('select with group observes its content', function() {
 });
 
 QUnit.test('select with group whose content is undefined doesn\'t breaks', function() {
-
   var content;
   run(function() {
     select.set('content', content);
@@ -608,8 +607,8 @@ QUnit.test('selection uses the same array when multiple=true', function() {
 
   select.$().trigger('change');
 
-  deepEqual(select.get('selection'), [tom,david], 'On change the selection is updated');
-  deepEqual(selection, [tom,david], 'On change the original selection array is updated');
+  deepEqual(select.get('selection'), [tom, david], 'On change the selection is updated');
+  deepEqual(selection, [tom, david], 'On change the original selection array is updated');
 });
 
 QUnit.test('Ember.SelectedOption knows when it is selected when multiple=false', function() {
@@ -736,7 +735,7 @@ QUnit.test('valueBinding handles 0 as initiated value (issue #2763)', function()
     select.destroy(); // Destroy the existing select
 
     select = EmberSelect.extend({
-      content: Ember.A([1,0]),
+      content: Ember.A([1, 0]),
       indirectData: indirectData,
       valueBinding: 'indirectData.value'
     }).create();

@@ -1,15 +1,22 @@
 import run from 'ember-metal/run_loop';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
 import compile from 'ember-template-compiler/system/compile';
 import { runAppend, runDestroy } from 'ember-runtime/tests/utils';
 
 import { set } from 'ember-metal/property_set';
 
-var component;
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
+var component, originalViewKeyword;
 
 QUnit.module('ember-htmlbars: destroy-element-hook tests', {
+  setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
+  },
   teardown() {
     runDestroy(component);
+    resetKeyword('view', originalViewKeyword);
   }
 });
 

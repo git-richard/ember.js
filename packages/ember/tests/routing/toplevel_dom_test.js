@@ -1,9 +1,7 @@
 import 'ember';
 import Ember from 'ember-metal/core';
-import EmberHandlebars from 'ember-htmlbars/compat';
+import { compile } from 'ember-template-compiler';
 import EmberView from 'ember-views/views/view';
-
-var compile = EmberHandlebars.compile;
 
 var Router, App, templates, router, container;
 
@@ -59,7 +57,7 @@ QUnit.test('Topmost template always get an element', function() {
 });
 
 QUnit.test('If topmost view has its own element, it doesn\'t get wrapped in a higher element', function() {
-  App.registry.register('view:application', EmberView.extend({
+  App.register('view:application', EmberView.extend({
     classNames: ['im-special']
   }));
   bootApplication();

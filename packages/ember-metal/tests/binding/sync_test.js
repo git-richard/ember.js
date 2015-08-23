@@ -6,13 +6,14 @@ import {
 import { bind } from 'ember-metal/binding';
 import { computed } from 'ember-metal/computed';
 import { defineProperty } from 'ember-metal/properties';
+import { propertyWillChange, propertyDidChange } from 'ember-metal/property_events';
 
 QUnit.module('system/binding/sync_test.js');
 
 testBoth('bindings should not sync twice in a single run loop', function(get, set) {
   var a, b, setValue;
-  var setCalled=0;
-  var getCalled=0;
+  var setCalled = 0;
+  var getCalled = 0;
 
   run(function() {
     a = {};
@@ -24,7 +25,9 @@ testBoth('bindings should not sync twice in a single run loop', function(get, se
       },
       set: function(key, value) {
         setCalled++;
+        propertyWillChange(this, key);
         setValue = value;
+        propertyDidChange(this, key);
         return value;
       }
     }).volatile());
@@ -49,7 +52,7 @@ testBoth('bindings should not sync twice in a single run loop', function(get, se
 
 testBoth('bindings should not infinite loop if computed properties return objects', function(get, set) {
   var a, b;
-  var getCalled=0;
+  var getCalled = 0;
 
   run(function() {
     a = {};

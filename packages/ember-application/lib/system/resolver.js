@@ -145,6 +145,12 @@ export default EmberObject.extend({
         });
       }
 
+      if (name.indexOf('-') > -1) {
+        result = result.replace(/-(.)/g, function(m) {
+          return m.charAt(1).toUpperCase();
+        });
+      }
+
       return type + ':' + result;
     } else {
       return fullName;
@@ -298,12 +304,12 @@ export default EmberObject.extend({
   resolveTemplate(parsedName) {
     var templateName = parsedName.fullNameWithoutType.replace(/\./g, '/');
 
-    if (Ember.TEMPLATES[templateName]) {
+    if (Ember.TEMPLATES.hasOwnProperty(templateName)) {
       return Ember.TEMPLATES[templateName];
     }
 
     templateName = decamelize(templateName);
-    if (Ember.TEMPLATES[templateName]) {
+    if (Ember.TEMPLATES.hasOwnProperty(templateName)) {
       return Ember.TEMPLATES[templateName];
     }
   },

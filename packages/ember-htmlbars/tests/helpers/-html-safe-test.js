@@ -1,7 +1,7 @@
 /* globals EmberDev */
 import Ember from 'ember-metal/core';
 import { Registry } from 'ember-runtime/system/container';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
 import compile from 'ember-template-compiler/system/compile';
 
 import { runAppend, runDestroy } from 'ember-runtime/tests/utils';
@@ -43,7 +43,6 @@ QUnit.test('adds the attribute to the element', function() {
 });
 
 if (!EmberDev.runningProdBuild) {
-
   QUnit.test('no warnings are triggered from setting style attribute', function() {
     component = Component.create({
       container,

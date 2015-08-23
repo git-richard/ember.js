@@ -5,7 +5,6 @@
 
 import Ember from 'ember-metal/core';
 import Cache from 'ember-metal/cache';
-import HandlebarsCompatibleHelper from 'ember-htmlbars/compat/helper';
 
 export var CONTAINS_DASH_CACHE = new Cache(1000, function(key) {
   return key.indexOf('-') !== -1;
@@ -21,10 +20,6 @@ export function validateLazyHelperName(helperName, container, keywords, knownHel
   }
 }
 
-function isLegacyBareHelper(helper) {
-  return helper && (!helper.isHelperFactory && !helper.isHelperInstance && !helper.isHTMLBars);
-}
-
 /**
   Used to lookup/resolve handlebars helpers. The lookup order is:
 
@@ -37,7 +32,7 @@ function isLegacyBareHelper(helper) {
   @private
   @method resolveHelper
   @param {String} name the name of the helper to lookup
-  @return {Handlebars Helper}
+  @return {Helper}
 */
 export function findHelper(name, view, env) {
   var helper = env.helpers[name];
@@ -46,12 +41,9 @@ export function findHelper(name, view, env) {
     var container = env.container;
     if (validateLazyHelperName(name, container, env.hooks.keywords, env.knownHelpers)) {
       var helperName = 'helper:' + name;
-      if (container._registry.has(helperName)) {
+      if (container.registry.has(helperName)) {
         helper = container.lookupFactory(helperName);
-        if (isLegacyBareHelper(helper)) {
-          Ember.deprecate(`The helper "${name}" is a deprecated bare function helper. Please use Ember.Helper.build to wrap helper functions.`);
-          helper = new HandlebarsCompatibleHelper(helper);
-        }
+        Ember.assert(`Expected to find an Ember.Helper with the name ${helperName}, but found an object of type ${typeof helper} instead.`, helper.isHelperFactory || helper.isHelperInstance);
       }
     }
   }

@@ -4,7 +4,6 @@
 */
 
 import Ember from 'ember-metal/core'; // Ember.EXTEND_PROTOTYPES, Ember.assert
-import expandProperties from 'ember-metal/expand_properties';
 import { computed } from 'ember-metal/computed';
 import { observer } from 'ember-metal/mixin';
 
@@ -12,7 +11,6 @@ var a_slice = Array.prototype.slice;
 var FunctionPrototype = Function.prototype;
 
 if (Ember.EXTEND_PROTOTYPES === true || Ember.EXTEND_PROTOTYPES.Function) {
-
   /**
     The `property` extension of Javascript's Function prototype is available
     when `Ember.EXTEND_PROTOTYPES` or `Ember.EXTEND_PROTOTYPES.Function` is
@@ -96,8 +94,7 @@ if (Ember.EXTEND_PROTOTYPES === true || Ember.EXTEND_PROTOTYPES.Function) {
     });
     ```
 
-    In the future this method may become asynchronous. If you want to ensure
-    synchronous behavior, use `observesImmediately`.
+    In the future this method may become asynchronous.
 
     See `Ember.observer`.
 
@@ -110,6 +107,21 @@ if (Ember.EXTEND_PROTOTYPES === true || Ember.EXTEND_PROTOTYPES.Function) {
     return observer.apply(this, args);
   };
 
+
+  FunctionPrototype._observesImmediately = function () {
+    Ember.assert('Immediate observers must observe internal properties only, ' +
+                 'not properties on other objects.', function checkIsInternalProperty() {
+      for (var i = 0, l = arguments.length; i < l; i++) {
+        if (arguments[i].indexOf('.') !== -1) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // observes handles property expansion
+    return this.observes(...arguments);
+  };
   /**
     The `observesImmediately` extension of Javascript's Function prototype is
     available when `Ember.EXTEND_PROTOTYPES` or
@@ -134,60 +146,12 @@ if (Ember.EXTEND_PROTOTYPES === true || Ember.EXTEND_PROTOTYPES.Function) {
 
     @method observesImmediately
     @for Function
+    @deprecated
     @private
   */
-  FunctionPrototype.observesImmediately = function () {
-    Ember.assert('Immediate observers must observe internal properties only, ' +
-                 'not properties on other objects.', function checkIsInternalProperty() {
-      for (var i = 0, l = arguments.length; i < l; i++) {
-        if (arguments[i].indexOf('.') !== -1) {
-          return false;
-        }
-      }
-      return true;
-    });
-
-    // observes handles property expansion
-    return this.observes(...arguments);
-  };
-
-  /**
-    The `observesBefore` extension of Javascript's Function prototype is
-    available when `Ember.EXTEND_PROTOTYPES` or
-    `Ember.EXTEND_PROTOTYPES.Function` is true, which is the default.
-
-    You can get notified when a property change is about to happen by
-    adding the `observesBefore` call to the end of your method
-    declarations in classes that you write. For example:
-
-    ```javascript
-    Ember.Object.extend({
-      valueObserver: function() {
-        // Executes whenever the "value" property is about to change
-      }.observesBefore('value')
-    });
-    ```
-
-    See `Ember.beforeObserver`.
-
-    @method observesBefore
-    @for Function
-    @private
-  */
-  FunctionPrototype.observesBefore = function () {
-    var watched = [];
-    var addWatchedProperty = function (obs) {
-      watched.push(obs);
-    };
-
-    for (var i = 0, l = arguments.length; i < l; ++i) {
-      expandProperties(arguments[i], addWatchedProperty);
-    }
-
-    this.__ember_observesBefore__ = watched;
-
-    return this;
-  };
+  FunctionPrototype.observesImmediately = Ember.deprecateFunc('Function#observesImmediately is deprecated. Use Function#observes instead',
+                                                              { id: 'ember-runtime.ext-function', until: '3.0.0' },
+                                                              FunctionPrototype._observesImmediately);
 
   /**
     The `on` extension of Javascript's Function prototype is available

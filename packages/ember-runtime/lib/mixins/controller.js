@@ -4,10 +4,6 @@ import ActionHandler from 'ember-runtime/mixins/action_handler';
 import ControllerContentModelAliasDeprecation from 'ember-runtime/mixins/controller_content_model_alias_deprecation';
 
 /**
-  `Ember.ControllerMixin` provides a standard interface for all classes that
-  compose Ember's controller layer: `Ember.Controller`,
-  `Ember.ArrayController`, and `Ember.ObjectController`.
-
   @class ControllerMixin
   @namespace Ember
   @uses Ember.ActionHandler
@@ -34,7 +30,7 @@ export default Mixin.create(ActionHandler, ControllerContentModelAliasDeprecatio
 
     @property target
     @default null
-    @private
+    @public
   */
   target: null,
 

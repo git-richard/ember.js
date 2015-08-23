@@ -26,7 +26,7 @@ QUnit.module('Data Adapter', {
       App = EmberApplication.create();
       App.toString = function() { return 'App'; };
       App.deferReadiness();
-      App.registry.register('data-adapter:main', DataAdapter);
+      App.register('data-adapter:main', DataAdapter);
     });
   },
   teardown() {
@@ -43,7 +43,7 @@ QUnit.test('Model types added with DefaultResolver', function() {
   adapter = App.__container__.lookup('data-adapter:main');
   adapter.reopen({
     getRecords() {
-      return Ember.A([1,2,3]);
+      return Ember.A([1, 2, 3]);
     },
     columnsForType() {
       return [{ name: 'title', desc: 'Title' }];
@@ -53,7 +53,6 @@ QUnit.test('Model types added with DefaultResolver', function() {
   run(App, 'advanceReadiness');
 
   var modelTypesAdded = function(types) {
-
     equal(types.length, 1);
     var postType = types[0];
     equal(postType.name, 'post', 'Correctly sets the name');
@@ -89,12 +88,12 @@ QUnit.test('Model types added with custom container-debug-adapter', function() {
       return [PostClass];
     }
   });
-  App.registry.register('container-debug-adapter:main', StubContainerDebugAdapter);
+  App.register('container-debug-adapter:main', StubContainerDebugAdapter);
 
   adapter = App.__container__.lookup('data-adapter:main');
   adapter.reopen({
     getRecords() {
-      return Ember.A([1,2,3]);
+      return Ember.A([1, 2, 3]);
     },
     columnsForType() {
       return [{ name: 'title', desc: 'Title' }];
@@ -104,7 +103,6 @@ QUnit.test('Model types added with custom container-debug-adapter', function() {
   run(App, 'advanceReadiness');
 
   var modelTypesAdded = function(types) {
-
     equal(types.length, 1);
     var postType = types[0];
 
@@ -121,7 +119,7 @@ QUnit.test('Model Types Updated', function() {
   App.Post = Model.extend();
 
   adapter = App.__container__.lookup('data-adapter:main');
-  var records = Ember.A([1,2,3]);
+  var records = Ember.A([1, 2, 3]);
   adapter.reopen({
     getRecords() {
       return records;
@@ -137,13 +135,11 @@ QUnit.test('Model Types Updated', function() {
   };
 
   var modelTypesUpdated = function(types) {
-
     var postType = types[0];
     equal(postType.count, 4, 'Correctly updates the count');
   };
 
   adapter.watchModelTypes(modelTypesAdded, modelTypesUpdated);
-
 });
 
 QUnit.test('Records Added', function() {

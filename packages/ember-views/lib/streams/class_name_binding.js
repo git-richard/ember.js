@@ -84,10 +84,8 @@ export function classStringForValue(path, val, className, falsyClassName) {
   if (className || falsyClassName) {
     if (className && !!val) {
       return className;
-
     } else if (falsyClassName && !val) {
       return falsyClassName;
-
     } else {
       return null;
     }
@@ -99,7 +97,7 @@ export function classStringForValue(path, val, className, falsyClassName) {
     // as a class name. For exaple, content.foo.barBaz
     // becomes bar-baz.
     var parts = path.split('.');
-    return dasherize(parts[parts.length-1]);
+    return dasherize(parts[parts.length - 1]);
 
   // If the value is not false, undefined, or null, return the current
   // value of the property.
@@ -125,7 +123,7 @@ export function streamifyClassNameBinding(view, classNameBinding, prefix) {
       parsedPath.falsyClassName
     );
   } else {
-    var pathValue = view.getStream(prefix+parsedPath.path);
+    var pathValue = view.getStream(prefix + parsedPath.path);
     return chain(pathValue, function() {
       return classStringForValue(
         parsedPath.path,

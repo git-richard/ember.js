@@ -12,6 +12,8 @@ import EmberObject from 'ember-runtime/system/object';
 import EmberRoute from 'ember-routing/system/route';
 import jQuery from 'ember-views/system/jquery';
 import compile from 'ember-template-compiler/system/compile';
+import { _loaded } from 'ember-runtime/system/lazy_load';
+import isEnabled from 'ember-metal/features';
 
 var trim = jQuery.trim;
 
@@ -96,6 +98,22 @@ QUnit.test('acts like a namespace', function() {
   app.Foo = EmberObject.extend();
   equal(app.Foo.toString(), 'TestApp.Foo', 'Classes pick up their parent namespace');
 });
+
+if (isEnabled('ember-registry-container-reform')) {
+  QUnit.test('includes deprecated access to `application.registry`', function() {
+    expect(3);
+
+    ok(typeof application.registry.register === 'function', '#registry.register is available as a function');
+
+    application.__registry__.register = function() {
+      ok(true, '#register alias is called correctly');
+    };
+
+    expectDeprecation(function() {
+      application.registry.register();
+    }, /Using `Application.registry.register` is deprecated. Please use `Application.register` instead./);
+  });
+}
 
 QUnit.module('Ember.Application initialization', {
   teardown() {
@@ -323,18 +341,6 @@ QUnit.test('can specify custom router', function() {
   ok(app.__container__.lookup('router:main') instanceof CustomRouter, 'application resolved the correct router');
 });
 
-QUnit.test('throws helpful error if `app.then` is used', function() {
-  run(function() {
-    app = Application.create({
-      rootElement: '#qunit-fixture'
-    });
-  });
-
-  expectDeprecation(function() {
-    run(app, 'then', function() { return this; });
-  }, /Do not use `.then` on an instance of Ember.Application.  Please use the `.ready` hook instead./);
-});
-
 QUnit.test('registers controls onto to container', function() {
   run(function() {
     app = Application.create({
@@ -343,4 +349,12 @@ QUnit.test('registers controls onto to container', function() {
   });
 
   ok(app.__container__.lookup('view:select'), 'Select control is registered into views');
+});
+
+QUnit.test('does not leak itself in onLoad._loaded', function() {
+  equal(_loaded.application, undefined);
+  var app = run(Application, 'create');
+  equal(_loaded.application, app);
+  run(app, 'destroy');
+  equal(_loaded.application, undefined);
 });

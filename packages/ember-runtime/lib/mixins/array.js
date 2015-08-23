@@ -26,7 +26,7 @@ import {
   sendEvent,
   hasListeners
 } from 'ember-metal/events';
-import { isWatching } from 'ember-metal/watching';
+import EachProxy from 'ember-runtime/system/each_proxy';
 
 function arrayObserversHelper(obj, target, opts, operation, notify) {
   var willChange = (opts && opts.willChange) || 'arrayWillChange';
@@ -55,7 +55,7 @@ function arrayObserversHelper(obj, target, opts, operation, notify) {
   concrete implementation, but it can be used up by other classes that want
   to appear like arrays.
 
-  For example, ArrayProxy and ArrayController are both concrete classes that can
+  For example, ArrayProxy is a concrete classes that can
   be instantiated to implement array-like behavior. Both of these classes use
   the Array Mixin by way of the MutableArray mixin, which allows observable
   changes to be made to the underlying array.
@@ -76,7 +76,7 @@ function arrayObserversHelper(obj, target, opts, operation, notify) {
   membership of an array changes by using `.observes('myArray.[]')`.
 
   To support `Ember.Array` in your own class, you must override two
-  primitives to use it: `replace()` and `objectAt()`.
+  primitives to use it: `length()` and `objectAt()`.
 
   Note that the Ember.Array mixin also incorporates the `Ember.Enumerable`
   mixin. All `Ember.Array`-like objects are also enumerable.
@@ -313,7 +313,7 @@ export default Mixin.create(Enumerable, {
     var idx;
 
     if (startAt === undefined || startAt >= len) {
-      startAt = len-1;
+      startAt = len - 1;
     }
 
     if (startAt < 0) {
@@ -422,12 +422,12 @@ export default Mixin.create(Enumerable, {
       }
     }
 
-    // Make sure the @each proxy is set up if anyone is observing @each
-    if (isWatching(this, '@each')) {
-      get(this, '@each');
+    if (this.__each) {
+      this.__each.arrayWillChange(this, startIdx, removeAmt, addAmt);
     }
 
     sendEvent(this, '@array:before', [this, startIdx, removeAmt, addAmt]);
+
 
     if (startIdx >= 0 && removeAmt >= 0 && get(this, 'hasEnumerableObservers')) {
       removing = [];
@@ -489,6 +489,11 @@ export default Mixin.create(Enumerable, {
     }
 
     this.enumerableContentDidChange(removeAmt, adding);
+
+    if (this.__each) {
+      this.__each.arrayDidChange(this, startIdx, removeAmt, addAmt);
+    }
+
     sendEvent(this, '@array:change', [this, startIdx, removeAmt, addAmt]);
 
     var length = get(this, 'length');
@@ -500,17 +505,13 @@ export default Mixin.create(Enumerable, {
       propertyDidChange(this, 'firstObject');
     }
 
-    if (this.objectAt(length-1) !== cachedLast) {
+    if (this.objectAt(length - 1) !== cachedLast) {
       propertyWillChange(this, 'lastObject');
       propertyDidChange(this, 'lastObject');
     }
 
     return this;
   },
-
-  // ..........................................................
-  // ENUMERATED PROPERTIES
-  //
 
   /**
     Returns a special object that can be used to observe individual properties
@@ -525,13 +526,11 @@ export default Mixin.create(Enumerable, {
     @public
   */
   '@each': computed(function() {
+    // TODO use Symbol or add to meta
     if (!this.__each) {
-      // ES6TODO: GRRRRR
-      var EachProxy = requireModule('ember-runtime/system/each_proxy')['EachProxy'];
-
       this.__each = new EachProxy(this);
     }
 
     return this.__each;
-  })
+  }).volatile()
 });

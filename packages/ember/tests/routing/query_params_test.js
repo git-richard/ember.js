@@ -2,12 +2,9 @@ import 'ember';
 import Ember from 'ember-metal/core';
 import isEnabled from 'ember-metal/features';
 import { computed } from 'ember-metal/computed';
+import { compile } from 'ember-template-compiler';
 
-import EmberHandlebars from 'ember-htmlbars/compat';
-
-var compile = EmberHandlebars.compile;
-
-var Router, App, router, registry, container;
+var Router, App, router, container;
 var get = Ember.get;
 
 function bootApplication() {
@@ -71,10 +68,9 @@ function sharedSetup() {
 
     App.deferReadiness();
 
-    registry = App.registry;
     container = App.__container__;
 
-    registry.register('location:test', TestLocation);
+    App.register('location:test', TestLocation);
 
     startingURL = expectedReplaceURL = expectedPushURL = '';
 
@@ -112,7 +108,6 @@ QUnit.module('Routing with Query Params', {
 });
 
 if (isEnabled('ember-routing-route-configured-query-params')) {
-
   QUnit.test('Single query params can be set on the route', function() {
     Router.map(function() {
       this.route('home', { path: '/' });
@@ -158,7 +153,6 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
 
     Ember.run(router, 'transitionTo', 'home', { queryParams: { page: '4' } });
     equal(controller.get('page'), 4);
-
   });
 
   QUnit.test('Query params can map to different url keys configured on the route', function() {
@@ -532,7 +526,6 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
   });
 
   QUnit.test('Subresource naming style is supported when configuration is all on the route', function() {
-
     Router.map(function() {
       this.route('abc.def', { path: '/abcdef' }, function() {
         this.route('zoo');
@@ -670,11 +663,11 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
 
     var controller = container.lookup('controller:home');
 
-    setAndFlush(controller, 'foo', [1,2]);
+    setAndFlush(controller, 'foo', [1, 2]);
 
     equal(router.get('location.path'), '/?foo=%5B1%2C2%5D');
 
-    setAndFlush(controller, 'foo', [3,4]);
+    setAndFlush(controller, 'foo', [3, 4]);
     equal(router.get('location.path'), '/?foo=%5B3%2C4%5D');
   });
 
@@ -691,9 +684,9 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
 
     equal(router.get('location.path'), '');
 
-    Ember.run(router, 'transitionTo', { queryParams: { foo: [2,3] } });
+    Ember.run(router, 'transitionTo', { queryParams: { foo: [2, 3] } });
     equal(router.get('location.path'), '/?foo=%5B2%2C3%5D', 'shorthand supported');
-    Ember.run(router, 'transitionTo', { queryParams: { 'index:foo': [4,5] } });
+    Ember.run(router, 'transitionTo', { queryParams: { 'index:foo': [4, 5] } });
     equal(router.get('location.path'), '/?foo=%5B4%2C5%5D', 'longform supported');
     Ember.run(router, 'transitionTo', { queryParams: { foo: [] } });
     equal(router.get('location.path'), '/?foo=%5B%5D', 'longform supported');
@@ -712,7 +705,7 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     bootApplication();
 
     var controller = container.lookup('controller:index');
-    deepEqual(controller.get('foo'), ['1','2','3']);
+    deepEqual(controller.get('foo'), ['1', '2', '3']);
   });
 
   QUnit.test('Url with array query param sets controller property to array when configuration occurs on the route and there is still a controller', function() {
@@ -730,7 +723,7 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     bootApplication();
 
     var controller = container.lookup('controller:index');
-    deepEqual(controller.get('foo'), ['1','2','3']);
+    deepEqual(controller.get('foo'), ['1', '2', '3']);
   });
 
   QUnit.test('Array query params can be pushed/popped when configuration occurs on the route but there is still a controller', function() {
@@ -1502,7 +1495,6 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
   });
 
   QUnit.test('Subresource naming style is supported when configured on the route', function() {
-
     Router.map(function() {
       this.route('abc.def', { path: '/abcdef' }, function() {
         this.route('zoo');
@@ -1676,11 +1668,11 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
 
     var controller = container.lookup('controller:home');
 
-    setAndFlush(controller, 'foo', [1,2]);
+    setAndFlush(controller, 'foo', [1, 2]);
 
     equal(router.get('location.path'), '/?foo=%5B1%2C2%5D');
 
-    setAndFlush(controller, 'foo', [3,4]);
+    setAndFlush(controller, 'foo', [3, 4]);
     equal(router.get('location.path'), '/?foo=%5B3%2C4%5D');
   });
 
@@ -1697,9 +1689,9 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
 
     equal(router.get('location.path'), '');
 
-    Ember.run(router, 'transitionTo', { queryParams: { foo: [2,3] } });
+    Ember.run(router, 'transitionTo', { queryParams: { foo: [2, 3] } });
     equal(router.get('location.path'), '/?foo=%5B2%2C3%5D', 'shorthand supported');
-    Ember.run(router, 'transitionTo', { queryParams: { 'index:foo': [4,5] } });
+    Ember.run(router, 'transitionTo', { queryParams: { 'index:foo': [4, 5] } });
     equal(router.get('location.path'), '/?foo=%5B4%2C5%5D', 'longform supported');
     Ember.run(router, 'transitionTo', { queryParams: { foo: [] } });
     equal(router.get('location.path'), '/?foo=%5B%5D', 'longform supported');
@@ -1718,7 +1710,7 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     bootApplication();
 
     var controller = container.lookup('controller:index');
-    deepEqual(controller.get('foo'), ['1','2','3']);
+    deepEqual(controller.get('foo'), ['1', '2', '3']);
   });
 
   QUnit.test('Array query params can be pushed/popped when configured on the route', function() {
@@ -1816,7 +1808,7 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     App.OtherRoute = Ember.Route.extend({
       model(p, trans) {
         var m = Ember.meta(trans.params.application);
-        ok(!m.watching.woot, 'A meta object isn\'t constructed for this params POJO');
+        ok(!m.peekWatching('woot'), 'A meta object isn\'t constructed for this params POJO');
       }
     });
 
@@ -1960,30 +1952,6 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     equal(get(controller, 'foo'), '456');
   });
 } else {
-  QUnit.test('Single query params can be set on ObjectController [DEPRECATED]', function() {
-    expectDeprecation('Ember.ObjectController is deprecated, please use Ember.Controller and use `model.propertyName`.');
-
-    Router.map(function() {
-      this.route('home', { path: '/' });
-    });
-
-    App.HomeController = Ember.ObjectController.extend({
-      queryParams: ['foo'],
-      foo: '123'
-    });
-
-    bootApplication();
-
-    var controller = container.lookup('controller:home');
-
-    setAndFlush(controller, 'foo', '456');
-
-    equal(router.get('location.path'), '/?foo=456');
-
-    setAndFlush(controller, 'foo', '987');
-    equal(router.get('location.path'), '/?foo=987');
-  });
-
   QUnit.test('Single query params can be set on the controller [DEPRECATED]', function() {
     Router.map(function() {
       this.route('home', { path: '/' });
@@ -2711,7 +2679,6 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
   });
 
   QUnit.test('Subresource naming style is supported', function() {
-
     Router.map(function() {
       this.route('abc.def', { path: '/abcdef' }, function() {
         this.route('zoo');
@@ -2862,11 +2829,11 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
 
     var controller = container.lookup('controller:home');
 
-    setAndFlush(controller, 'foo', [1,2]);
+    setAndFlush(controller, 'foo', [1, 2]);
 
     equal(router.get('location.path'), '/?foo=%5B1%2C2%5D');
 
-    setAndFlush(controller, 'foo', [3,4]);
+    setAndFlush(controller, 'foo', [3, 4]);
     equal(router.get('location.path'), '/?foo=%5B3%2C4%5D');
   });
 
@@ -2880,9 +2847,9 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
 
     equal(router.get('location.path'), '');
 
-    Ember.run(router, 'transitionTo', { queryParams: { foo: [2,3] } });
+    Ember.run(router, 'transitionTo', { queryParams: { foo: [2, 3] } });
     equal(router.get('location.path'), '/?foo=%5B2%2C3%5D', 'shorthand supported');
-    Ember.run(router, 'transitionTo', { queryParams: { 'index:foo': [4,5] } });
+    Ember.run(router, 'transitionTo', { queryParams: { 'index:foo': [4, 5] } });
     equal(router.get('location.path'), '/?foo=%5B4%2C5%5D', 'longform supported');
     Ember.run(router, 'transitionTo', { queryParams: { foo: [] } });
     equal(router.get('location.path'), '/?foo=%5B%5D', 'longform supported');
@@ -2898,7 +2865,7 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     bootApplication();
 
     var controller = container.lookup('controller:index');
-    deepEqual(controller.get('foo'), ['1','2','3']);
+    deepEqual(controller.get('foo'), ['1', '2', '3']);
   });
 
   QUnit.test('Array query params can be pushed/popped', function() {
@@ -2990,7 +2957,7 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     App.OtherRoute = Ember.Route.extend({
       model(p, trans) {
         var m = Ember.meta(trans.params.application);
-        ok(!m.watching.woot, 'A meta object isn\'t constructed for this params POJO');
+        ok(!m.peekWatching('woot'), 'A meta object isn\'t constructed for this params POJO');
       }
     });
 
@@ -3108,4 +3075,27 @@ QUnit.test('warn user that routes query params configuration must be an Object, 
   expectAssertion(function() {
     bootApplication();
   }, 'You passed in `[{"commitBy":{"replace":true}}]` as the value for `queryParams` but `queryParams` cannot be an Array');
+});
+
+QUnit.test('handle routes names that clash with Object.prototype properties', function() {
+  expect(1);
+
+  Router.map(function() {
+    this.route('constructor');
+  });
+
+  App.ConstructorRoute = Ember.Route.extend({
+    queryParams: {
+      foo: {
+        defaultValue: '123'
+      }
+    }
+  });
+
+  bootApplication();
+
+  Ember.run(router, 'transitionTo', 'constructor', { queryParams: { foo: '999' } });
+
+  var controller = container.lookup('controller:constructor');
+  equal(get(controller, 'foo'), '999');
 });

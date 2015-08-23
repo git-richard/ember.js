@@ -14,25 +14,24 @@ import {
   unsubscribe as instrumentationUnsubscribe
 } from 'ember-metal/instrumentation';
 import {
-  EMPTY_META,
   GUID_KEY,
-  META_DESC,
   apply,
   applyStr,
   canInvoke,
   generateGuid,
-  getMeta,
   guidFor,
   inspect,
   makeArray,
-  meta,
-  metaPath,
-  setMeta,
   deprecatedTryCatchFinally,
   tryInvoke,
   uuid,
   wrap
 } from 'ember-metal/utils';
+import {
+  EMPTY_META,
+  META_DESC,
+  meta
+} from 'ember-metal/meta';
 import EmberError from 'ember-metal/error';
 import Cache from 'ember-metal/cache';
 import Logger from 'ember-metal/logger';
@@ -157,23 +156,17 @@ computed.any = any;
 computed.collect = collect;
 
 import {
-  _suspendBeforeObserver,
-  _suspendBeforeObservers,
   _suspendObserver,
   _suspendObservers,
-  addBeforeObserver,
   addObserver,
-  beforeObserversFor,
   observersFor,
-  removeBeforeObserver,
   removeObserver
 } from 'ember-metal/observer';
 import {
   IS_BINDING,
   Mixin,
   aliasMethod,
-  beforeObserver,
-  immediateObserver,
+  _immediateObserver,
   mixin,
   observer,
   required
@@ -181,8 +174,7 @@ import {
 import {
   Binding,
   bind,
-  isGlobalPath,
-  oneWay
+  isGlobalPath
 } from 'ember-metal/binding';
 import run from 'ember-metal/run_loop';
 import Libraries from 'ember-metal/libraries';
@@ -191,20 +183,6 @@ import isEmpty from 'ember-metal/is_empty';
 import isBlank from 'ember-metal/is_blank';
 import isPresent from 'ember-metal/is_present';
 import Backburner from 'backburner';
-import {
-  isStream,
-  subscribe,
-  unsubscribe,
-  read,
-  readHash,
-  readArray,
-  scanArray,
-  scanHash,
-  concat,
-  chain
-} from 'ember-metal/streams/utils';
-
-import Stream from 'ember-metal/streams/stream';
 
 // END IMPORTS
 
@@ -232,9 +210,6 @@ Ember.guidFor         = guidFor;
 Ember.META_DESC       = META_DESC;
 Ember.EMPTY_META      = EMPTY_META;
 Ember.meta            = meta;
-Ember.getMeta         = getMeta;
-Ember.setMeta         = setMeta;
-Ember.metaPath        = metaPath;
 Ember.inspect         = inspect;
 Ember.tryCatchFinally = deprecatedTryCatchFinally;
 Ember.makeArray       = makeArray;
@@ -310,24 +285,17 @@ Ember.cacheFor = cacheFor;
 Ember.addObserver = addObserver;
 Ember.observersFor = observersFor;
 Ember.removeObserver = removeObserver;
-Ember.addBeforeObserver = addBeforeObserver;
-Ember._suspendBeforeObserver = _suspendBeforeObserver;
-Ember._suspendBeforeObservers = _suspendBeforeObservers;
 Ember._suspendObserver = _suspendObserver;
 Ember._suspendObservers = _suspendObservers;
-Ember.beforeObserversFor = beforeObserversFor;
-Ember.removeBeforeObserver = removeBeforeObserver;
 
 Ember.IS_BINDING = IS_BINDING;
 Ember.required = required;
 Ember.aliasMethod = aliasMethod;
 Ember.observer = observer;
-Ember.immediateObserver = immediateObserver;
-Ember.beforeObserver = beforeObserver;
+Ember.immediateObserver = _immediateObserver;
 Ember.mixin = mixin;
 Ember.Mixin = Mixin;
 
-Ember.oneWay = oneWay;
 Ember.bind = bind;
 Ember.Binding = Binding;
 Ember.isGlobalPath = isGlobalPath;
@@ -353,23 +321,6 @@ Ember.isBlank = isBlank;
 Ember.isPresent = isPresent;
 
 Ember.merge = merge;
-
-if (isEnabled('ember-metal-stream')) {
-  Ember.stream = {
-    Stream: Stream,
-
-    isStream: isStream,
-    subscribe: subscribe,
-    unsubscribe: unsubscribe,
-    read: read,
-    readHash: readHash,
-    readArray: readArray,
-    scanArray: scanArray,
-    scanHash: scanHash,
-    concat: concat,
-    chain: chain
-  };
-}
 
 Ember.FEATURES = FEATURES;
 Ember.FEATURES.isEnabled = isEnabled;
@@ -400,11 +351,19 @@ Ember.onerror = null;
 
 // do this for side-effects of updating Ember.assert, warn, etc when
 // ember-debug is present
+// This needs to be called before any deprecateFunc
 if (Ember.__loader.registry['ember-debug']) {
   requireModule('ember-debug');
+} else {
+  Ember.Debug = { };
+
+  if (isEnabled('ember-debug-handlers')) {
+    Ember.Debug.registerDeprecationHandler = function() { };
+    Ember.Debug.registerWarnHandler = function() { };
+  }
 }
 
-Ember.create = Ember.deprecateFunc('Ember.create is deprecated in favor of Object.create', Object.create);
-Ember.keys = Ember.deprecateFunc('Ember.keys is deprecated in favor of Object.keys', Object.keys);
+Ember.create = Ember.deprecateFunc('Ember.create is deprecated in favor of Object.create', { id: 'ember-metal.ember-create', until: '3.0.0' }, Object.create);
+Ember.keys = Ember.deprecateFunc('Ember.keys is deprecated in favor of Object.keys', { id: 'ember-metal.ember.keys', until: '3.0.0' }, Object.keys);
 
 export default Ember;

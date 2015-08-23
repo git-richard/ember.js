@@ -13,15 +13,11 @@ function fileMap(revision,tag,date) {
   };
 };
 
-function fileObject(baseName, extension, contentType, currentRevision, tag, date){
+function fileObject(baseName, extension, contentType, currentRevision, tag, date) {
   var fullName = "/" + baseName + extension;
   var obj =  {
     contentType: contentType,
       destinations: {
-        glimmer: [
-          "glimmer" + fullName,
-          "canary/shas/" + currentRevision + fullName
-        ],
         canary: [
           "latest" + fullName,
           "canary" + fullName,
@@ -33,6 +29,11 @@ function fileObject(baseName, extension, contentType, currentRevision, tag, date
           "release" + fullName,
           "release/daily/" + date + fullName,
           "release/shas/" + currentRevision + fullName
+        ],
+        'release-1-13': [
+          "release-1-13" + fullName,
+          "release-1-13/daily/" + date + fullName,
+          "release-1-13/shas/" + currentRevision + fullName
         ],
         beta: [
           "beta" + fullName,

@@ -24,10 +24,10 @@ fixed your bug.
 2. Search for similar issues. It's possible somebody has encountered
 this bug already.
 
-3. Provide JSFiddle or JSBin demo that specifically shows the problem. This
+3. Provide Ember Twiddle or JSBin demo that specifically shows the problem. This
 demo should be fully operational with the exception of the bug you want to
 demonstrate. The more pared down, the better.
-Preconfigured starting points for the latest Ember: [JSFiddle](https://jsfiddle.net/dfcaus7t/1/) | [JSBin](http://emberjs.jsbin.com) (may not work with older IE versions due to MIME type issues).
+preconfigured starting points for the latest Ember: [Ember Twiddle](http://ember-twiddle.com/) | [JSBin](http://emberjs.jsbin.com) (may not work with older IE versions due to MIME type issues).
 If it is not possible to produce a fiddle, please make sure you provide very
 specific steps to reproduce the error. If we cannot reproduce it, we will
 close the ticket.
@@ -47,22 +47,30 @@ there is a bug and the faster we'll be able to take action.
 
 ## Requesting a Feature
 
-1. Search Issues for similar feature requests. It's possible somebody has
-already asked for this feature or provided a pull request that we're still
-discussing.
+1. Ember has an RFC process for feature requests. To begin the discussion either
+[gather feedback](https://github.com/emberjs/rfcs/blob/master/README.md#gathering-feedback-before-submitting)
+on the emberjs/rfcs repository. Or, draft an [Ember RFC](https://github.com/emberjs/rfcs#ember-rfcs)
+   - Use RFC pull request for well formed ideas.
+   - Use RFC issues to propose a rough idea, basically a great place to test
+     the waters.
 
 2. Provide a clear and detailed explanation of the feature you want and why
 it's important to add. Keep in mind that we want features that will be useful
 to the majority of our users and not just a small subset. If you're just
 targeting a minority of users, consider writing an add-on library for Ember.
 
-3. If the feature is complex, consider writing some initial documentation for
-it. If we do end up accepting the feature it will need to be documented and
-this will also help us to understand it better ourselves.
+3. If the feature is complex, consider writing an Ember RFC document. If we do
+end up accepting the feature, the RFC provides the needed documentation for
+contributors to develop the feature according the specifcaiton accepted by the core team.
 
-4. Attempt a Pull Request. If you're at all able, start writing some code. We
-always have more work to do than time to do it. If you can write some code
-then that will speed the process along.
+4. After disussing the feature you may choose to attempt a Pull Request. If
+you're at all able, start writing some code. We always have more work to do
+than time to do it. If you can write some code then that will speed the process
+along.
+
+In short, if you have an idea that would be nice to have, create an issue on the
+emberjs/rfcs repo. If you have a question about requesting a feature, start a
+discussion at [discuss.emberjs.com](http://discuss.emberjs.com)
 
 # Building Ember.js
 
@@ -162,6 +170,44 @@ And in case we didn't emphasize it enough: we love tests!
 
 NOTE: Partially copied from https://raw.github.com/thoughtbot/factory_girl_rails/master/CONTRIBUTING.md
 
+# Travis CI Tests
+
+We use [Travis CI](https://travis-ci.org/emberjs/ember.js/pull_requests) to test each PR before it is merged.
+
+When you submit your PR (or later change that code), a Travis build will automatically be kicked off.  A note will be added to the PR, and will indicate the current status of the build.
+
+Within the Travis build, you can see that we (currently) run six different test suites.
+
+* The `each-package-tests` test suite is closest to what you normally run locally on your machine.
+* The `build-tests EMBER_ENV=production...` test suite runs tests against a production build.
+* The `sauce` test suite runs tests against various supported browsers.
+
+## Common Travis CI Build Issues
+
+### Production Build Failures
+
+If your build is failing on the 'production' suite, you may be relying on a debug-only function that does not even exist in a production build (`Ember.warn`, `Ember.deprecate`, `Ember.assert`, etc.).  These will pass on the 'each-package-tests' suite (and locally) because those functions are present in development builds.
+
+There are helpers for many of these functions, which will resolve this for you: `expectDeprecation`, `expectAssertion`, etc.  Please use these helpers when dealing with these functions.
+
+If your tests can't aren't covered a helper, one common solution is the use of `EmberDev.runningProdBuild`.  Wrapping the debug-only dependent test in a check of this flag will cause that test to not be run in the prod test suite:
+```
+if (EmberDev && !EmberDev.runningProdBuild) {
+  // Development-only test goes here
+}
+```
+Note: before using this approach, please be certain your test is really depending on a debug-only function and not truly failing in production.
+
+To recreate this build environment locally:
+* Run `ember serve --environment=production` in a terminal (takes much much longer than a default `ember s`)
+* Browse to `localhost:4200/tests/index.html?skipPackage=container,ember-testing,ember-debug&dist=prod&prod=true`
+
+### Single Unexplained Test Suite Failure
+
+Sometimes a single test suite will fail, without giving any indication of a real error.  Sometimes this is just a phantom crash.
+* Try to recreate the test environment locally (see above for production builds)
+* Restart all the test suites on Travis CI by doing another push
+* Ask a repo collab to restart that single test suite
 
 # Appendix
 
@@ -174,6 +220,8 @@ All commits should be tagged. Tags are denoted by square brackets (`[]`) and com
 In general bug fixes are pulled into the beta branch. As such, the prefix is: `[BUGFIX beta]`. If a bug fix is a serious regression that requires a new patch release, `[BUGFIX release]` can be used instead.
 
 For bugs related to canary features, follow the prefixing rules for features.
+
+The vast majority of bug fixes apply to the current stable or beta releases, so submit your PR against `emberjs:master` with one of the above mentioned BUGFIX tags.  (In the unusual case of a bug fix specifically for a past release, tag for that release `[BUGFIX release-1-13]` and submit the PR against the stable branch for that release: `emberjs:stable-1-13`.)
 
 ### Cleanup
 

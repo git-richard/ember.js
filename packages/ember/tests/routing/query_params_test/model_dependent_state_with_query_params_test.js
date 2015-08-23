@@ -1,10 +1,7 @@
 import 'ember';
 import Ember from 'ember-metal/core';
 import isEnabled from 'ember-metal/features';
-
-import EmberHandlebars from 'ember-htmlbars/compat';
-
-var compile = EmberHandlebars.compile;
+import { compile } from 'ember-template-compiler';
 
 var Router, App, router, registry, container;
 
@@ -69,7 +66,7 @@ function sharedSetup() {
 
     App.deferReadiness();
 
-    registry = App.registry;
+    registry = App.__registry__;
     container = App.__container__;
 
     registry.register('location:test', TestLocation);
@@ -352,7 +349,7 @@ QUnit.module('Model Dep Query Params', {
           deepEqual(params, self.expectedModelHookParams, 'the ArticleRoute model hook received the expected merged dynamic segment + query params hash');
           self.expectedModelHookParams = null;
         }
-        return articles.findProperty('id', params.id);
+        return articles.findBy('id', params.id);
       }
     });
 
@@ -443,7 +440,7 @@ QUnit.module('Model Dep Query Params (nested)', {
           deepEqual(params, self.expectedModelHookParams, 'the ArticleRoute model hook received the expected merged dynamic segment + query params hash');
           self.expectedModelHookParams = null;
         }
-        return site_articles.findProperty('id', params.id);
+        return site_articles.findBy('id', params.id);
       }
     });
 
@@ -547,7 +544,7 @@ QUnit.module('Model Dep Query Params (nested & more than 1 dynamic segment)', {
           deepEqual(params, self.expectedSiteModelHookParams, 'the SiteRoute model hook received the expected merged dynamic segment + query params hash');
           self.expectedSiteModelHookParams = null;
         }
-        return sites.findProperty('id', params.site_id);
+        return sites.findBy('id', params.site_id);
       }
     });
     App.SiteArticleRoute = Ember.Route.extend({
@@ -556,7 +553,7 @@ QUnit.module('Model Dep Query Params (nested & more than 1 dynamic segment)', {
           deepEqual(params, self.expectedArticleModelHookParams, 'the SiteArticleRoute model hook received the expected merged dynamic segment + query params hash');
           self.expectedArticleModelHookParams = null;
         }
-        return site_articles.findProperty('id', params.article_id);
+        return site_articles.findBy('id', params.article_id);
       }
     });
 
@@ -698,11 +695,9 @@ QUnit.test('query params have \'model\' stickiness by default', function() {
   equal(this.links['s-3-a-1'].attr('href'), '/site/s-3/a/a-1?q=lol');
   equal(this.links['s-3-a-2'].attr('href'), '/site/s-3/a/a-2');
   equal(this.links['s-3-a-3'].attr('href'), '/site/s-3/a/a-3');
-
 });
 
 QUnit.test('query params have \'model\' stickiness by default (url changes)', function() {
-
   this.boot();
 
   this.expectedSiteModelHookParams = { site_id: 's-1', country: 'au' };

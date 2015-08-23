@@ -2,10 +2,7 @@ import 'ember';
 import Ember from 'ember-metal/core';
 import isEnabled from 'ember-metal/features';
 import { capitalize } from 'ember-runtime/system/string';
-
-import EmberHandlebars from 'ember-htmlbars/compat';
-
-var compile = EmberHandlebars.compile;
+import { compile } from 'ember-template-compiler';
 
 var App, Router, container, router, registry;
 var expectedReplaceURL, expectedPushURL;
@@ -53,7 +50,7 @@ function sharedSetup() {
 
     App.deferReadiness();
 
-    registry = App.registry;
+    registry = App.__registry__;
     container = App.__container__;
 
     registry.register('location:test', TestLocation);

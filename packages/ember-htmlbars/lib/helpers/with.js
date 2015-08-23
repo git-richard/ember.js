@@ -1,9 +1,8 @@
 /**
 @module ember
-@submodule ember-htmlbars
+@submodule ember-templates
 */
 
-import normalizeSelf from 'ember-htmlbars/utils/normalize-self';
 import shouldDisplay from 'ember-views/streams/should_display';
 
 /**
@@ -33,7 +32,7 @@ import shouldDisplay from 'ember-views/streams/should_display';
   the first part of the property path, `foo`. Instead, use `{{#with foo.bar as |baz|}}`.
 
   @method with
-  @for Ember.Handlebars.helpers
+  @for Ember.Templates.helpers
   @param {Object} options
   @return {String} HTML string
   @public
@@ -41,26 +40,7 @@ import shouldDisplay from 'ember-views/streams/should_display';
 
 export default function withHelper(params, hash, options) {
   if (shouldDisplay(params[0])) {
-    var preserveContext = false;
-
-    if (options.template.arity !== 0) {
-      preserveContext = true;
-    }
-
-    if (preserveContext) {
-      this.yield([params[0]]);
-    } else {
-      let self = normalizeSelf(params[0]);
-      if (hash.controller) {
-        self = {
-          hasBoundController: true,
-          controller: hash.controller,
-          self: self
-        };
-      }
-
-      this.yield([], self);
-    }
+    options.template.yield([params[0]]);
   } else if (options.inverse && options.inverse.yield) {
     options.inverse.yield([]);
   }

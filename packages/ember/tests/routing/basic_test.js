@@ -5,11 +5,8 @@ import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
 import ActionManager from 'ember-views/system/action_manager';
 import EmberView from 'ember-views/views/view';
-import { arrayControllerDeprecation } from 'ember-runtime/controllers/array_controller';
+import { compile } from 'ember-template-compiler';
 
-import EmberHandlebars from 'ember-htmlbars/compat';
-
-var compile = EmberHandlebars.compile;
 var trim = Ember.$.trim;
 
 var Router, App, router, registry, container, originalLoggerError;
@@ -46,7 +43,7 @@ function handleURLRejectsWith(path, expectedReason) {
     router.handleURL(path).then(function(value) {
       ok(false, 'expected handleURLing: `' + path + '` to fail');
     }, function(reason) {
-      equal(expectedReason, reason);
+      equal(reason, expectedReason);
     });
   });
 }
@@ -70,7 +67,7 @@ QUnit.module('Basic Routing', {
       App.LoadingRoute = Ember.Route.extend({
       });
 
-      registry = App.registry;
+      registry = App.__registry__;
       container = App.__container__;
 
       Ember.TEMPLATES.application = compile('{{outlet}}');
@@ -305,6 +302,116 @@ QUnit.test('Model passed via renderTemplate model is set as controller\'s model'
   equal(Ember.$('p:contains(emberjs)', '#qunit-fixture').length, 1, 'Passed model was set as controllers model');
 });
 
+if (isEnabled('ember-routing-routable-components')) {
+  QUnit.test('Renders the GlimmerComponent for the route', function() {
+    Ember.TEMPLATES['home'] = null;
+    Ember.TEMPLATES['components/home'] = compile('<p>{{name}}</p>');
+
+    Router.map(function() {
+      this.route('home', { path: '/' });
+    });
+
+    App.HomeRoute = Ember.Route.extend();
+
+    App.HomeComponent = Ember.Component.extend({
+      isGlimmerComponent: true,
+      name: 'Home'
+    });
+
+    bootApplication();
+
+    equal(Ember.$('p:contains(Home)', '#qunit-fixture').length, 1, 'The home component was rendered');
+  });
+
+  QUnit.test('Must be a GlimmerComponent to prevent component naming collisions', function() {
+    Ember.TEMPLATES['home'] = null;
+    Ember.TEMPLATES['components/home'] = compile('<p>{{name}}</p>');
+
+    Router.map(function() {
+      this.route('home', { path: '/' });
+    });
+
+    App.HomeRoute = Ember.Route.extend();
+
+    // Not a GlimmerComponent, shouldn't be rendered
+    App.HomeComponent = Ember.Component.extend({
+      name: 'Home'
+    });
+
+    bootApplication();
+
+    equal(Ember.$('p:contains(Home)', '#qunit-fixture').length, 0, 'The home component was not rendered');
+  });
+
+  QUnit.test('Favors existing templates/views over the component for the route', function() {
+    Ember.TEMPLATES['home'] = compile('PASS');
+    Ember.TEMPLATES['components/home'] = compile('FAIL');
+
+    Router.map(function() {
+      this.route('home', { path: '/' });
+    });
+
+    App.HomeRoute = Ember.Route.extend();
+
+    App.HomeComponent = Ember.Component.extend({
+      isGlimmerComponent: true
+    });
+
+    bootApplication();
+
+    equal(Ember.$('#qunit-fixture').text(), 'PASS', 'The home view was rendered instead of the component');
+  });
+
+  QUnit.test('Renders the component given in the component option', function() {
+    Ember.TEMPLATES['home'] = null;
+    Ember.TEMPLATES['components/home'] = compile('<p>{{name}}</p>');
+
+    Router.map(function() {
+      this.route('home', { path: '/' });
+    });
+
+    App.HomeRoute = Ember.Route.extend({
+      renderTemplate() {
+        this.render({ component: 'home' });
+      }
+    });
+
+    App.HomeComponent = Ember.Component.extend({
+      isGlimmerComponent: true,
+      name: 'Home'
+    });
+
+    bootApplication();
+
+    equal(Ember.$('p:contains(Home)', '#qunit-fixture').length, 1, 'The home component was rendered');
+  });
+
+  QUnit.test('Routable components get passed model in their attrs', function() {
+    Ember.TEMPLATES['home'] = null;
+    Ember.TEMPLATES['components/home'] = compile('<p>{{attrs.model.name}}</p>');
+
+    Router.map(function() {
+      this.route('home', { path: '/' });
+    });
+
+    App.HomeRoute = Ember.Route.extend({
+      model() {
+        return {
+          name: 'Home'
+        };
+      }
+    });
+
+    App.HomeComponent = Ember.Component.extend({
+      isGlimmerComponent: true
+    });
+
+    bootApplication();
+
+    equal(Ember.$('p:contains(Home)', '#qunit-fixture').length, 1, 'The model was present');
+  });
+}
+
 QUnit.test('Renders correct view with slash notation', function() {
   Ember.TEMPLATES['home/page'] = compile('<p>{{view.name}}</p>');
 
@@ -442,7 +549,6 @@ QUnit.test('defining templateName allows other templates to be rendered', functi
   });
 
   equal(Ember.$('.alert-box', '#qunit-fixture').text(), 'Invader!', 'Template for alert was render into outlet');
-
 });
 
 QUnit.test('Specifying a name to render should have precedence over everything else', function() {
@@ -628,13 +734,11 @@ QUnit.test('The Homepage with a `setupController` hook modifying other controlle
 });
 
 QUnit.test('The Homepage with a computed context that does not get overridden', function() {
-  expectDeprecation(arrayControllerDeprecation);
-
   Router.map(function() {
     this.route('home', { path: '/' });
   });
 
-  App.HomeController = Ember.ArrayController.extend({
+  App.HomeController = Ember.Controller.extend({
     model: Ember.computed(function() {
       return Ember.A([
         'Monday through Friday: 9am to 5pm',
@@ -654,8 +758,6 @@ QUnit.test('The Homepage with a computed context that does not get overridden', 
 });
 
 QUnit.test('The Homepage getting its controller context via model', function() {
-  expectDeprecation(arrayControllerDeprecation);
-
   Router.map(function() {
     this.route('home', { path: '/' });
   });
@@ -921,7 +1023,6 @@ QUnit.test('The Special page returning an error invokes SpecialRoute\'s error ha
 });
 
 function testOverridableErrorHandler(handlersName) {
-
   expect(2);
 
   Router.map(function() {
@@ -967,12 +1068,6 @@ function testOverridableErrorHandler(handlersName) {
 
 QUnit.test('ApplicationRoute\'s default error handler can be overridden', function() {
   testOverridableErrorHandler('actions');
-});
-
-QUnit.test('ApplicationRoute\'s default error handler can be overridden (with DEPRECATED `events`)', function() {
-  ignoreDeprecation(function() {
-    testOverridableErrorHandler('events');
-  });
 });
 
 asyncTest('Moving from one page to another triggers the correct callbacks', function() {
@@ -1248,82 +1343,7 @@ QUnit.asyncTest('Events defined in `actions` object are triggered on the current
   action.handler(event);
 });
 
-QUnit.asyncTest('Events are triggered on the current state when defined in `events` object (DEPRECATED)', function() {
-  Router.map(function() {
-    this.route('home', { path: '/' });
-  });
-
-  var model = { name: 'Tom Dale' };
-
-  App.HomeRoute = Ember.Route.extend({
-    model() {
-      return model;
-    },
-
-    events: {
-      showStuff(obj) {
-        ok(this instanceof App.HomeRoute, 'the handler is an App.HomeRoute');
-        // Using Ember.copy removes any private Ember vars which older IE would be confused by
-        deepEqual(Ember.copy(obj, true), { name: 'Tom Dale' }, 'the context is correct');
-        QUnit.start();
-      }
-    }
-  });
-
-  Ember.TEMPLATES.home = compile(
-    '<a {{action \'showStuff\' model}}>{{name}}</a>'
-  );
-
-  expectDeprecation(/Action handlers contained in an `events` object are deprecated/);
-  bootApplication();
-
-  var actionId = Ember.$('#qunit-fixture a').data('ember-action');
-  var [ action ] = ActionManager.registeredActions[actionId];
-  var event = new Ember.$.Event('click');
-  action.handler(event);
-});
-
-QUnit.asyncTest('Events defined in `events` object are triggered on the current state when routes are nested (DEPRECATED)', function() {
-  Router.map(function() {
-    this.route('root', { path: '/' }, function() {
-      this.route('index', { path: '/' });
-    });
-  });
-
-  var model = { name: 'Tom Dale' };
-
-  App.RootRoute = Ember.Route.extend({
-    events: {
-      showStuff(obj) {
-        ok(this instanceof App.RootRoute, 'the handler is an App.HomeRoute');
-        // Using Ember.copy removes any private Ember vars which older IE would be confused by
-        deepEqual(Ember.copy(obj, true), { name: 'Tom Dale' }, 'the context is correct');
-        QUnit.start();
-      }
-    }
-  });
-
-  App.RootIndexRoute = Ember.Route.extend({
-    model() {
-      return model;
-    }
-  });
-
-  Ember.TEMPLATES['root/index'] = compile(
-    '<a {{action \'showStuff\' model}}>{{name}}</a>'
-  );
-
-  expectDeprecation(/Action handlers contained in an `events` object are deprecated/);
-  bootApplication();
-
-  var actionId = Ember.$('#qunit-fixture a').data('ember-action');
-  var [ action ] = ActionManager.registeredActions[actionId];
-  var event = new Ember.$.Event('click');
-  action.handler(event);
-});
-
 QUnit.test('Events can be handled by inherited event handlers', function() {
-
   expect(4);
 
   App.SuperRoute = Ember.Route.extend({
@@ -1471,7 +1491,6 @@ QUnit.test('transitioning multiple times in a single run loop only sets the URL 
 });
 
 QUnit.test('navigating away triggers a url property change', function() {
-
   expect(3);
 
   Router.map(function() {
@@ -1829,7 +1848,6 @@ QUnit.test('Redirecting to the current target in the middle of a route does not 
 
   equal(router.container.lookup('controller:application').get('currentPath'), 'foo.bar.baz');
   equal(successCount, 1, 'transitionTo success handler was called once');
-
 });
 
 QUnit.test('Redirecting to the current target with a different context aborts the remainder of the routes', function() {
@@ -2263,7 +2281,6 @@ QUnit.test('Generated route should be an instance of App.Route if provided', fun
   generatedRoute = container.lookup('route:posts');
 
   ok(generatedRoute instanceof App.Route, 'should extend the correct route');
-
 });
 
 QUnit.test('Nested index route is not overriden by parent\'s implicit index route', function() {
@@ -2289,8 +2306,6 @@ QUnit.test('Nested index route is not overriden by parent\'s implicit index rout
 });
 
 QUnit.test('Application template does not duplicate when re-rendered', function() {
-  expectDeprecation(arrayControllerDeprecation);
-
   Ember.TEMPLATES.application = compile('<h3>I Render Once</h3>{{outlet}}');
 
   Router.map(function() {
@@ -2470,7 +2485,6 @@ QUnit.test('ApplicationRoute with model does not proxy the currentPath', functio
 });
 
 QUnit.test('Promises encountered on app load put app into loading state until resolved', function() {
-
   expect(2);
 
   var deferred = Ember.RSVP.defer();
@@ -2550,7 +2564,6 @@ QUnit.test('Route should tear down multiple outlets', function() {
   equal(Ember.$('div.posts-menu:contains(postsMenu)', '#qunit-fixture').length, 0, 'The posts/menu template was removed');
   equal(Ember.$('p.posts-index:contains(postsIndex)', '#qunit-fixture').length, 0, 'The posts/index template was removed');
   equal(Ember.$('div.posts-footer:contains(postsFooter)', '#qunit-fixture').length, 0, 'The posts/footer template was removed');
-
 });
 
 
@@ -2742,53 +2755,51 @@ QUnit.test('Route silently fails when cleaning an outlet from an inactive view',
   Ember.run(function() { router.send('hideModal'); });
 });
 
-if (isEnabled('ember-router-willtransition')) {
-  QUnit.test('Router `willTransition` hook passes in cancellable transition', function() {
-    // Should hit willTransition 3 times, once for the initial route, and then 2 more times
-    // for the two handleURL calls below
-    expect(3);
+QUnit.test('Router `willTransition` hook passes in cancellable transition', function() {
+  // Should hit willTransition 3 times, once for the initial route, and then 2 more times
+  // for the two handleURL calls below
+  expect(3);
 
-    Router.map(function() {
-      this.route('nork');
-      this.route('about');
-    });
-
-    Router.reopen({
-      init() {
-        this._super();
-        this.on('willTransition', this.testWillTransitionHook);
-      },
-      testWillTransitionHook(transition, url) {
-        ok(true, 'willTransition was called ' + url);
-        transition.abort();
-      }
-    });
-
-    App.LoadingRoute = Ember.Route.extend({
-      activate() {
-        ok(false, 'LoadingRoute was not entered');
-      }
-    });
-
-    App.NorkRoute = Ember.Route.extend({
-      activate() {
-        ok(false, 'NorkRoute was not entered');
-      }
-    });
-
-    App.AboutRoute = Ember.Route.extend({
-      activate() {
-        ok(false, 'AboutRoute was not entered');
-      }
-    });
-
-    bootApplication();
-
-    // Attempted transitions out of index should abort.
-    Ember.run(router, 'handleURL', '/nork');
-    Ember.run(router, 'handleURL', '/about');
+  Router.map(function() {
+    this.route('nork');
+    this.route('about');
   });
-}
+
+  Router.reopen({
+    init() {
+      this._super();
+      this.on('willTransition', this.testWillTransitionHook);
+    },
+    testWillTransitionHook(transition, url) {
+      ok(true, 'willTransition was called ' + url);
+      transition.abort();
+    }
+  });
+
+  App.LoadingRoute = Ember.Route.extend({
+    activate() {
+      ok(false, 'LoadingRoute was not entered');
+    }
+  });
+
+  App.NorkRoute = Ember.Route.extend({
+    activate() {
+      ok(false, 'NorkRoute was not entered');
+    }
+  });
+
+  App.AboutRoute = Ember.Route.extend({
+    activate() {
+      ok(false, 'AboutRoute was not entered');
+    }
+  });
+
+  bootApplication();
+
+  // Attempted transitions out of index should abort.
+  Ember.run(router, 'handleURL', '/nork');
+  Ember.run(router, 'handleURL', '/about');
+});
 
 QUnit.test('Aborting/redirecting the transition in `willTransition` prevents LoadingRoute from being entered', function() {
   expect(8);
@@ -2957,7 +2968,6 @@ QUnit.test('`deactivate` event fires on the route', function() {
 });
 
 QUnit.test('Actions can be handled by inherited action handlers', function() {
-
   expect(4);
 
   App.SuperRoute = Ember.Route.extend({
@@ -2996,7 +3006,6 @@ QUnit.test('Actions can be handled by inherited action handlers', function() {
 });
 
 QUnit.test('currentRouteName is a property installed on ApplicationController that can be used in transitionTo', function() {
-
   expect(24);
 
   Router.map(function() {
@@ -3055,34 +3064,6 @@ QUnit.test('Route model hook finds the same model as a manual find', function() 
   handleURL('/post/1');
 
   equal(App.Post, Post);
-});
-
-QUnit.test('Can register an implementation via Ember.Location.registerImplementation (DEPRECATED)', function() {
-  var TestLocation = Ember.NoneLocation.extend({
-    implementation: 'test'
-  });
-
-  expectDeprecation(/Using the Ember.Location.registerImplementation is no longer supported/);
-
-  Ember.Location.registerImplementation('test', TestLocation);
-
-  Router.reopen({
-    location: 'test'
-  });
-
-  bootApplication();
-
-  equal(router.get('location.implementation'), 'test', 'custom location implementation can be registered with registerImplementation');
-});
-
-QUnit.test('Ember.Location.registerImplementation is deprecated', function() {
-  var TestLocation = Ember.NoneLocation.extend({
-    implementation: 'test'
-  });
-
-  expectDeprecation(function() {
-    Ember.Location.registerImplementation('test', TestLocation);
-  }, 'Using the Ember.Location.registerImplementation is no longer supported. Register your custom location implementation with the container instead.');
 });
 
 QUnit.test('Routes can refresh themselves causing their model hooks to be re-run', function() {
@@ -3184,6 +3165,8 @@ QUnit.test('Redirecting with null model doesn\'t error out', function() {
 });
 
 QUnit.test('rejecting the model hooks promise with a non-error prints the `message` property', function() {
+  expect(5);
+
   var rejectedMessage = 'OMG!! SOOOOOO BAD!!!!';
   var rejectedStack   = 'Yeah, buddy: stack gets printed too.';
 
@@ -3203,10 +3186,16 @@ QUnit.test('rejecting the model hooks promise with a non-error prints the `messa
     }
   });
 
-  bootApplication();
+  throws(function() {
+    bootApplication();
+  }, function(err) {
+    equal(err.message, rejectedMessage);
+    return true;
+  }, 'expected an exception');
 });
 
 QUnit.test('rejecting the model hooks promise with an error with `errorThrown` property prints `errorThrown.message` property', function() {
+  expect(5);
   var rejectedMessage = 'OMG!! SOOOOOO BAD!!!!';
   var rejectedStack   = 'Yeah, buddy: stack gets printed too.';
 
@@ -3228,7 +3217,12 @@ QUnit.test('rejecting the model hooks promise with an error with `errorThrown` p
     }
   });
 
-  bootApplication();
+  throws(function() {
+    bootApplication();
+  }, function(err) {
+    equal(err.message, rejectedMessage);
+    return true;
+  }, 'expected an exception');
 });
 
 QUnit.test('rejecting the model hooks promise with no reason still logs error', function() {
@@ -3250,6 +3244,7 @@ QUnit.test('rejecting the model hooks promise with no reason still logs error', 
 });
 
 QUnit.test('rejecting the model hooks promise with a string shows a good error', function() {
+  expect(3);
   var originalLoggerError = Ember.Logger.error;
   var rejectedMessage = 'Supercalifragilisticexpialidocious';
 
@@ -3268,7 +3263,9 @@ QUnit.test('rejecting the model hooks promise with a string shows a good error',
     }
   });
 
-  bootApplication();
+  throws(function() {
+    bootApplication();
+  }, rejectedMessage, 'expected an exception');
 
   Ember.Logger.error = originalLoggerError;
 });
@@ -3303,7 +3300,7 @@ QUnit.test('willLeave, willChangeContext, willChangeModel actions don\'t fire un
 });
 
 QUnit.test('Errors in transitionTo within redirect hook are logged', function() {
-  expect(3);
+  expect(4);
   var actual = [];
 
   Router.map(function() {
@@ -3322,7 +3319,9 @@ QUnit.test('Errors in transitionTo within redirect hook are logged', function() 
     actual.push(arguments);
   };
 
-  bootApplication();
+  throws(function() {
+    bootApplication();
+  }, /More context objects were passed/);
 
   equal(actual.length, 1, 'the error is only logged once');
   equal(actual[0][0], 'Error while processing route: yondo', 'source route is printed');
@@ -3343,7 +3342,9 @@ QUnit.test('Errors in transition show error template if available', function() {
     }
   });
 
-  bootApplication();
+  throws(function() {
+    bootApplication();
+  }, /More context objects were passed/);
 
   equal(Ember.$('#error').length, 1, 'Error template was rendered.');
 });
@@ -3827,7 +3828,6 @@ QUnit.test('Can this.render({into:...}) the render helper\'s children', function
   equal(Ember.$('#qunit-fixture .foo .index').text(), 'other');
   Ember.run(router, 'send', 'changeToBar');
   equal(Ember.$('#qunit-fixture .foo .index').text(), 'bar');
-
 });
 
 QUnit.test('Can disconnect from the render helper\'s children', function() {
@@ -3964,4 +3964,61 @@ QUnit.test('Components inside an outlet have their didInsertElement hook invoked
 
   assert.strictEqual(myComponentCounter, 1, 'didInsertElement not invoked on displayed component');
   assert.strictEqual(otherComponentCounter, 1, 'didInsertElement invoked on displayed component');
+});
+
+QUnit.test('Doesnt swallow exception thrown from willTransition', function() {
+  expect(1);
+  Ember.TEMPLATES.application = compile('{{outlet}}');
+  Ember.TEMPLATES.index = compile('index');
+  Ember.TEMPLATES.other = compile('other');
+
+  Router.map(function() {
+    this.route('other', function() {
+    });
+  });
+
+  App.IndexRoute = Ember.Route.extend({
+    actions: {
+      willTransition() {
+        throw new Error('boom');
+      }
+    }
+  });
+
+  bootApplication();
+
+  throws(function() {
+    Ember.run(function() {
+      router.handleURL('/other');
+    });
+  }, /boom/, 'expected an exception that didnt happen');
+});
+
+QUnit.test('Exception if outlet name is undefined in render and disconnectOutlet', function(assert) {
+  App.ApplicationRoute = Ember.Route.extend({
+    actions: {
+      showModal: function() {
+        this.render({
+          outlet: undefined,
+          parentView: 'application'
+        });
+      },
+      hideModal: function() {
+        this.disconnectOutlet({
+          outlet: undefined,
+          parentView: 'application'
+        });
+      }
+    }
+  });
+
+  bootApplication();
+
+  throws(function() {
+    Ember.run(function() { router.send('showModal'); });
+  }, /You passed undefined as the outlet name/);
+
+  throws(function() {
+    Ember.run(function() { router.send('hideModal'); });
+  }, /You passed undefined as the outlet name/);
 });

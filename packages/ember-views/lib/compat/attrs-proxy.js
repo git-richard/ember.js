@@ -1,15 +1,8 @@
-import { get } from 'ember-metal/property_get';
 import { Mixin } from 'ember-metal/mixin';
-import { on } from 'ember-metal/events';
 import { symbol } from 'ember-metal/utils';
 import { PROPERTY_DID_CHANGE } from 'ember-metal/property_events';
-
-import {
-  addObserver,
-  removeObserver,
-  addBeforeObserver,
-  removeBeforeObserver
-} from 'ember-metal/observer';
+import { on } from 'ember-metal/events';
+import EmptyObject from 'ember-metal/empty_object';
 
 export function deprecation(key) {
   return `You tried to look up an attribute directly on the component. This is deprecated. Use attrs.${key} instead.`;
@@ -21,18 +14,36 @@ function isCell(val) {
   return val && val[MUTABLE_CELL];
 }
 
-function attrsWillChange(view, attrsKey) {
-  let key = attrsKey.slice(6);
-  view.currentState.legacyAttrWillChange(view, key);
-}
+function setupAvoidPropagating(instance) {
+  // This caches the list of properties to avoid setting onto the component instance
+  // inside `_propagateAttrsToThis`.  We cache them so that every instantiated component
+  // does not have to pay the calculation penalty.
+  let constructor = instance.constructor;
+  if (!constructor.__avoidPropagating) {
+    constructor.__avoidPropagating = new EmptyObject();
+    let i, l;
+    for (i = 0, l = instance.concatenatedProperties.length; i < l; i++) {
+      let prop = instance.concatenatedProperties[i];
 
-function attrsDidChange(view, attrsKey) {
-  let key = attrsKey.slice(6);
-  view.currentState.legacyAttrDidChange(view, key);
+      constructor.__avoidPropagating[prop] = true;
+    }
+
+    for (i = 0, l = instance.mergedProperties.length; i < l; i++) {
+      let prop = instance.mergedProperties[i];
+
+      constructor.__avoidPropagating[prop] = true;
+    }
+  }
 }
 
 let AttrsProxyMixin = {
   attrs: null,
+
+  init() {
+    this._super(...arguments);
+
+    setupAvoidPropagating(this);
+  },
 
   getAttr(key) {
     let attrs = this.attrs;
@@ -56,46 +67,38 @@ let AttrsProxyMixin = {
     val.update(value);
   },
 
-  willWatchProperty(key) {
-    if (this._isAngleBracket || key === 'attrs') { return; }
+  _propagateAttrsToThis() {
+    let attrs = this.attrs;
 
-    let attrsKey = `attrs.${key}`;
-    addBeforeObserver(this, attrsKey, null, attrsWillChange);
-    addObserver(this, attrsKey, null, attrsDidChange);
-  },
-
-  didUnwatchProperty(key) {
-    if (this._isAngleBracket || key === 'attrs') { return; }
-
-    let attrsKey = `attrs.${key}`;
-    removeBeforeObserver(this, attrsKey, null, attrsWillChange);
-    removeObserver(this, attrsKey, null, attrsDidChange);
-  },
-
-  legacyDidReceiveAttrs: on('didReceiveAttrs', function() {
-    if (this._isAngleBracket) { return; }
-
-    var keys = Object.keys(this.attrs);
-
-    for (var i=0, l=keys.length; i<l; i++) {
-      // Only issue the deprecation if it wasn't already issued when
-      // setting attributes initially.
-      if (!(keys[i] in this)) {
-        this.notifyPropertyChange(keys[i]);
+    for (let prop in attrs) {
+      if (prop !== 'attrs' && !this.constructor.__avoidPropagating[prop]) {
+        this.set(prop, this.getAttr(prop));
       }
     }
+  },
+
+  initializeShape: on('init', function() {
+    this._isDispatchingAttrs = false;
   }),
+
+  _internalDidReceiveAttrs() {
+    this._super();
+    this._isDispatchingAttrs = true;
+    this._propagateAttrsToThis();
+    this._isDispatchingAttrs = false;
+  },
+
 
   unknownProperty(key) {
     if (this._isAngleBracket) { return; }
 
-    var attrs = get(this, 'attrs');
+    var attrs = this.attrs;
 
     if (attrs && key in attrs) {
       // do not deprecate accessing `this[key]` at this time.
       // add this back when we have a proper migration path
-      // Ember.deprecate(deprecation(key));
-      let possibleCell = get(attrs, key);
+      // Ember.deprecate(deprecation(key), { id: 'ember-views.', until: '3.0.0' });
+      let possibleCell = attrs[key];
 
       if (possibleCell && possibleCell[MUTABLE_CELL]) {
         return possibleCell.value;
@@ -112,9 +115,10 @@ let AttrsProxyMixin = {
 
 AttrsProxyMixin[PROPERTY_DID_CHANGE] = function(key) {
   if (this._isAngleBracket) { return; }
+  if (this._isDispatchingAttrs) { return; }
 
-  if (this.currentState) {
-    this.currentState.legacyPropertyDidChange(this, key);
+  if (this._currentState) {
+    this._currentState.legacyPropertyDidChange(this, key);
   }
 };
 

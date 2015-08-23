@@ -10,7 +10,7 @@ import setProperties from 'ember-metal/set_properties';
 
 var EMPTY_ARRAY = [];
 
-var ViewChildViewsSupport = Mixin.create({
+export default Mixin.create({
   /**
     Array of child views. You should never edit this array directly.
     Instead, use `appendChild` and `removeFromParent`.
@@ -28,7 +28,7 @@ var ViewChildViewsSupport = Mixin.create({
     // setup child views. be sure to clone the child views array first
     // 2.0TODO: Remove Ember.A() here
     this.childViews = Ember.A(this.childViews.slice());
-    this.ownerView = this;
+    this.ownerView = this.ownerView || this;
   },
 
   appendChild(view) {
@@ -90,6 +90,8 @@ var ViewChildViewsSupport = Mixin.create({
 
     var attrs = _attrs || {};
     var view;
+
+    attrs.parentView = this;
     attrs.renderer = this.renderer;
     attrs._viewRegistry = this._viewRegistry;
 
@@ -123,15 +125,11 @@ var ViewChildViewsSupport = Mixin.create({
 
   linkChild(instance) {
     instance.container = this.container;
-    set(instance, 'parentView', this);
-    instance.trigger('parentViewDidChange');
+    instance.parentView = this;
     instance.ownerView = this.ownerView;
   },
 
   unlinkChild(instance) {
-    set(instance, 'parentView', null);
-    instance.trigger('parentViewDidChange');
+    instance.parentView = null;
   }
 });
-
-export default ViewChildViewsSupport;

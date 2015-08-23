@@ -1,75 +1,171 @@
+/**
+@module ember
+@submodule ember-templates
+*/
+
 import Ember from 'ember-metal/core';
-import isEnabled from 'ember-metal/features';
 import Stream from 'ember-metal/streams/stream';
-import { labelFor } from 'ember-metal/streams/utils';
-import { read, isStream } from 'ember-metal/streams/utils';
+import KeyStream from 'ember-metal/streams/key-stream';
+import { isStream } from 'ember-metal/streams/utils';
 import merge from 'ember-metal/merge';
+import subscribe from 'ember-htmlbars/utils/subscribe';
+import { get } from 'ember-metal/property_get';
+import { set } from 'ember-metal/property_set';
+import {
+  addObserver,
+  removeObserver
+} from 'ember-metal/observer';
 
-if (isEnabled('ember-htmlbars-get-helper')) {
-
-  var getKeyword = function getKeyword(morph, env, scope, params, hash, template, inverse, visitor) {
-    var objParam = params[0];
-    var pathParam = params[1];
-
-    Ember.assert('The first argument to {{get}} must be a stream', isStream(objParam));
-    Ember.assert('{{get}} requires at least two arguments', params.length > 1);
-
-    var getStream = new GetStream(objParam, pathParam);
-
-    if (morph === null) {
-      return getStream;
-    } else {
-      env.hooks.inline(morph, env, scope, '-get', [getStream], hash, visitor);
-    }
-
-    return true;
-  };
-
-  var GetStream = function GetStream(obj, path) {
-    this.init('(get '+labelFor(obj)+' '+labelFor(path)+')');
-
-    this.objectParam = obj;
-    this.pathParam = path;
-    this.lastPathValue = undefined;
-    this.valueDep = this.addMutableDependency();
-
-    this.addDependency(path);
-
-    // This next line is currently only required when the keyword
-    // is executed in a subexpression. More investigation required
-    // to remove the additional dependency
-    this.addDependency(obj);
-  };
-
-  GetStream.prototype = Object.create(Stream.prototype);
-
-  merge(GetStream.prototype, {
-    updateValueDependency() {
-      var pathValue = read(this.pathParam);
-
-      if (this.lastPathValue !== pathValue) {
-        if (typeof pathValue === 'string') {
-          this.valueDep.replace(this.objectParam.get(pathValue));
-        } else {
-          this.valueDep.replace();
-        }
-
-        this.lastPathValue = pathValue;
-      }
-    },
-
-    compute() {
-      this.updateValueDependency();
-      return this.valueDep.getValue();
-    },
-
-    setValue(value) {
-      this.updateValueDependency();
-      this.valueDep.setValue(value);
-    }
-
-  });
-
+function labelFor(source, key) {
+  const sourceLabel = source.label ? source.label : '';
+  const keyLabel = key.label ? key.label : '';
+  return `(get ${sourceLabel} ${keyLabel})`;
 }
+
+const buildStream = function buildStream(params) {
+  const [objRef, pathRef] = params;
+
+  Ember.assert('The first argument to {{get}} must be a stream', isStream(objRef));
+  Ember.assert('{{get}} requires at least two arguments', params.length > 1);
+
+  const stream = new DynamicKeyStream(objRef, pathRef);
+
+  return stream;
+};
+
+
+/**
+  Dynamically look up a property on an object. The second argument to `{{get}}`
+  should have a string value, although it can be bound.
+
+  For example, these two usages are equivilent:
+
+  ```handlebars
+  {{person.height}}
+  {{get person "height"}}
+  ```
+
+  If there were several facts about a person, the `{{get}}` helper can dynamically
+  pick one:
+
+  ```handlebars
+  {{get person factName}}
+  ```
+
+  For a more complex example, this template would allow the user to switch
+  between showing the user's height and weight with a click:
+
+  ```handlebars
+  {{get person factName}}
+  <button {{action (mut factName) "height"}}>Show height</button>
+  <button {{action (mut factName) "weight"}}>Show weight</button>
+  ```
+
+  The `{{get}}` helper can also respect mutable values itself. For example:
+
+  ```handlebars
+  {{input value=(mut (get person factName)) type="text"}}
+  <button {{action (mut factName) "height"}}>Show height</button>
+  <button {{action (mut factName) "weight"}}>Show weight</button>
+  ```
+
+  Would allow the user to swap what fact is being displayed, and also edit
+  that fact via a two-way mutable binding.
+
+  @public
+  @method get
+  @for Ember.Templates.helpers
+*/
+var getKeyword = function getKeyword(morph, env, scope, params, hash, template, inverse, visitor) {
+  if (morph === null) {
+    return buildStream(params);
+  } else {
+    let stream;
+    if (morph.linkedResult) {
+      stream = morph.linkedResult;
+    } else {
+      stream = buildStream(params);
+
+      subscribe(morph, env, scope, stream);
+      env.hooks.linkRenderNode(morph, env, scope, null, params, hash);
+
+      morph.linkedResult = stream;
+    }
+    env.hooks.range(morph, env, scope, null, stream, visitor);
+  }
+
+  return true;
+};
+
+var DynamicKeyStream = function DynamicKeyStream(source, keySource) {
+  if (!isStream(keySource)) {
+    return new KeyStream(source, keySource);
+  }
+  Ember.assert('DynamicKeyStream error: source must be a stream', isStream(source)); // TODO: This isn't necessary.
+
+  // used to get the original path for debugging and legacy purposes
+  var label = labelFor(source, keySource);
+
+  this.init(label);
+  this.path = label;
+  this.sourceDep = this.addMutableDependency(source);
+  this.keyDep = this.addMutableDependency(keySource);
+  this.observedObject = null;
+  this.observedKey = null;
+};
+
+DynamicKeyStream.prototype = Object.create(KeyStream.prototype);
+
+merge(DynamicKeyStream.prototype, {
+  key() {
+    const key = this.keyDep.getValue();
+    if (typeof key === 'string') {
+      Ember.assert('DynamicKeyStream error: key must not have a \'.\'', key.indexOf('.') === -1);
+      return key;
+    }
+  },
+
+  compute() {
+    var object = this.sourceDep.getValue();
+    var key = this.key();
+    if (object && key) {
+      return get(object, key);
+    }
+  },
+
+  setValue(value) {
+    var object = this.sourceDep.getValue();
+    var key = this.key();
+    if (object) {
+      set(object, key, value);
+    }
+  },
+
+  _super$revalidate: Stream.prototype.revalidate,
+
+  revalidate(value) {
+    this._super$revalidate(value);
+
+    var object = this.sourceDep.getValue();
+    var key = this.key();
+    if (object !== this.observedObject || key !== this.observedKey) {
+      this._clearObservedObject();
+
+      if (object && typeof object === 'object' && key) {
+        addObserver(object, key, this, this.notify);
+        this.observedObject = object;
+        this.observedKey = key;
+      }
+    }
+  },
+
+  _clearObservedObject() {
+    if (this.observedObject) {
+      removeObserver(this.observedObject, this.observedKey, this, this.notify);
+      this.observedObject = null;
+      this.observedKey = null;
+    }
+  }
+});
 
 export default getKeyword;

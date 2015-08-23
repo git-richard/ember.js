@@ -35,7 +35,9 @@
         window.Ember = {
           testing: true
         };
-        window.ENV = window.ENV || {};
+        window.ENV = window.ENV || {
+          _ENABLE_LEGACY_VIEW_SUPPORT: true
+        };
 
         window.printTestCounts = function() {
           var passing = $("li[id^='qunit-'].pass").length;
@@ -146,14 +148,6 @@
         QUnit.config.urlConfig.push('nojshint');
         QUnit.config.urlConfig.push('forceskip');
       })();
-    </script>
-
-    <script>
-      // Silence view-related deprecations in tests to avoid overflowing travis ci's log
-      Ember.Debug._addDeprecationLevel('view.helper', Ember.Debug._deprecationLevels.SILENCE);
-      Ember.Debug._addDeprecationLevel('view.helper.select', Ember.Debug._deprecationLevels.SILENCE);
-      Ember.Debug._addDeprecationLevel('view.keyword.view', Ember.Debug._deprecationLevels.SILENCE);
-      Ember.Debug._addDeprecationLevel('view.keyword.controller', Ember.Debug._deprecationLevels.SILENCE);
     </script>
 
     <script>

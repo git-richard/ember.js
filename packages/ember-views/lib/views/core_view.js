@@ -3,7 +3,7 @@ import { get } from 'ember-metal/property_get';
 
 import EmberObject from 'ember-runtime/system/object';
 import Evented from 'ember-runtime/mixins/evented';
-import ActionHandler from 'ember-runtime/mixins/action_handler';
+import ActionHandler, { deprecateUnderscoreActions } from 'ember-runtime/mixins/action_handler';
 import { typeOf } from 'ember-runtime/utils';
 
 import Renderer from 'ember-metal-views/renderer';
@@ -43,7 +43,7 @@ var CoreView = EmberObject.extend(Evented, ActionHandler, {
   init() {
     this._super.apply(this, arguments);
     this._state = 'preRender';
-    this.currentState = this._states.preRender;
+    this._currentState = this._states.preRender;
     this._isVisible = get(this, 'isVisible');
 
     // Fallback for legacy cases where the view was created directly
@@ -54,7 +54,7 @@ var CoreView = EmberObject.extend(Evented, ActionHandler, {
       this.renderer = renderer;
     }
 
-    this.isDestroyingSubtree = false;
+    this._destroyingSubtreeForView = null;
     this._dispatching = null;
   },
 
@@ -106,20 +106,19 @@ var CoreView = EmberObject.extend(Evented, ActionHandler, {
   },
 
   destroy() {
-    var parent = this.parentView;
-
     if (!this._super(...arguments)) { return; }
 
-    this.currentState.cleanup(this);
+    this._currentState.cleanup(this);
 
-    if (!this.ownerView.isDestroyingSubtree) {
-      this.ownerView.isDestroyingSubtree = true;
-      if (parent) { parent.removeChild(this); }
-      if (this._renderNode) {
-        Ember.assert('BUG: Render node exists without concomitant env.', this.ownerView.env);
-        internal.clearMorph(this._renderNode, this.ownerView.env, true);
-      }
-      this.ownerView.isDestroyingSubtree = false;
+    // If the destroyingSubtreeForView property is not set but we have an
+    // associated render node, it means this view is being destroyed from user
+    // code and not via a change in the templating layer (like an {{if}}
+    // becoming falsy, for example).  In this case, it is our responsibility to
+    // make sure that any render nodes created as part of the rendering process
+    // are cleaned up.
+    if (!this.ownerView._destroyingSubtreeForView && this._renderNode) {
+      Ember.assert('BUG: Render node exists without concomitant env.', this.ownerView.env);
+      internal.clearMorph(this._renderNode, this.ownerView.env, true);
     }
 
     return this;
@@ -130,13 +129,17 @@ var CoreView = EmberObject.extend(Evented, ActionHandler, {
   destroyElement: K
 });
 
+deprecateUnderscoreActions(CoreView);
+
 CoreView.reopenClass({
   isViewFactory: true
 });
 
 export var DeprecatedCoreView = CoreView.extend({
   init() {
-    Ember.deprecate('Ember.CoreView is deprecated. Please use Ember.View.', false);
+    Ember.deprecate('Ember.CoreView is deprecated. Please use Ember.View.',
+                    false,
+                    { id: 'ember-views.core-view', until: '2.4.0' });
     this._super.apply(this, arguments);
   }
 });

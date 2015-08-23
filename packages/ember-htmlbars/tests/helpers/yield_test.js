@@ -6,31 +6,42 @@ import { computed } from 'ember-metal/computed';
 import { Registry } from 'ember-runtime/system/container';
 //import { set } from "ember-metal/property_set";
 import { A } from 'ember-runtime/system/native_array';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
 import helpers from 'ember-htmlbars/helpers';
-import {
-  registerHelper
-} from 'ember-htmlbars/helpers';
-import makeViewHelper from 'ember-htmlbars/system/make-view-helper';
+import ComponentLookup from 'ember-views/component_lookup';
 
 import compile from 'ember-template-compiler/system/compile';
 import { runAppend, runDestroy } from 'ember-runtime/tests/utils';
 
-var view, registry, container;
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
+var view, registry, container, originalViewKeyword;
+
+function setupContainer() {
+  registry = new Registry();
+  container = registry.container();
+  registry.optionsForType('template', { instantiate: false });
+  registry.register('component-lookup:main', ComponentLookup);
+}
+
+function teardownContainer() {
+  runDestroy(container);
+  registry = container = view = null;
+}
 
 QUnit.module('ember-htmlbars: Support for {{yield}} helper', {
   setup() {
-    registry = new Registry();
-    container = registry.container();
-    registry.optionsForType('template', { instantiate: false });
+    setupContainer();
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
   },
   teardown() {
     run(function() {
       Ember.TEMPLATES = {};
     });
     runDestroy(view);
-    runDestroy(container);
-    registry = container = view = null;
+    teardownContainer();
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -66,7 +77,6 @@ QUnit.test('block should work properly even when templates are not hard-coded', 
   runAppend(view);
 
   equal(view.$('div.wrapper div.page-body').length, 1, 'page-body is embedded within wrapping my-page');
-
 });
 
 QUnit.test('templates should yield to block, when the yield is embedded in a hierarchy of virtual views', function() {
@@ -76,7 +86,7 @@ QUnit.test('templates should yield to block, when the yield is embedded in a hie
     index: computed(function() {
       var n = this.attrs.n;
       var indexArray = A();
-      for (var i=0; i < n; i++) {
+      for (var i = 0; i < n; i++) {
         indexArray[i] = i;
       }
       return indexArray;
@@ -137,27 +147,6 @@ QUnit.test('yield uses the outer context', function() {
   runAppend(view);
 
   equal(view.$('div p:contains(inner) + p:contains(outer)').length, 1, 'Yield points at the right context');
-});
-
-
-QUnit.test('yield inside a conditional uses the outer context [DEPRECATED]', function() {
-  var component = Component.extend({
-    boundText: 'inner',
-    truthy: true,
-    obj: {},
-    layout: compile('<p>{{boundText}}</p><p>{{#if truthy}}{{#with obj}}{{yield}}{{/with}}{{/if}}</p>')
-  });
-
-  view = EmberView.create({
-    controller: { boundText: 'outer', truthy: true, obj: { component: component, truthy: true, boundText: 'insideWith' } },
-    template: compile('{{#with obj}}{{#if truthy}}{{#view component}}{{#if truthy}}{{boundText}}{{/if}}{{/view}}{{/if}}{{/with}}')
-  });
-
-  expectDeprecation(function() {
-    runAppend(view);
-  }, 'Using the context switching form of `{{with}}` is deprecated. Please use the block param form (`{{#with bar as |foo|}}`) instead.');
-
-  equal(view.$('div p:contains(inner) + p:contains(insideWith)').length, 1, 'Yield points at the right context');
 });
 
 QUnit.test('outer keyword doesn\'t mask inner component property', function () {
@@ -249,7 +238,6 @@ QUnit.test('yield should work for views even if parentView is null', function() 
   });
 
   equal(view.$().text(), 'Layout: View Content');
-
 });
 
 QUnit.test('simple bindings inside of a yielded template should work properly when the yield is nested inside of another view', function() {
@@ -281,11 +269,15 @@ QUnit.test('nested simple bindings inside of a yielded template should work prop
 });
 
 QUnit.module('ember-htmlbars: Component {{yield}}', {
-  setup() {},
+  setup() {
+    setupContainer();
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
+  },
   teardown() {
     runDestroy(view);
     delete helpers['inner-component'];
     delete helpers['outer-component'];
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -294,15 +286,17 @@ QUnit.test('yield with nested components (#3220)', function() {
     layout: compile('{{yield}}')
   });
 
-  registerHelper('inner-component', makeViewHelper(InnerComponent));
+  registry.register('component:inner-component', InnerComponent);
 
   var OuterComponent = Component.extend({
     layout: compile('{{#inner-component}}<span>{{yield}}</span>{{/inner-component}}')
   });
 
-  registerHelper('outer-component', makeViewHelper(OuterComponent));
+  registry.register('component:outer-component', OuterComponent);
 
   view = EmberView.extend({
+    container,
+
     template: compile(
       '{{#outer-component}}Hello world{{/outer-component}}'
     )

@@ -4,23 +4,21 @@
 */
 
 import Ember from 'ember-metal/core'; // FEATURES, Logger, assert
-import isEnabled from 'ember-metal/features';
 
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
 import { computed } from 'ember-metal/computed';
+import { deprecatingAlias } from 'ember-metal/computed_macros';
 import { isSimpleClick } from 'ember-views/system/utils';
-import EmberComponent from 'ember-views/views/component';
+import EmberComponent from 'ember-views/components/component';
 import inject from 'ember-runtime/inject';
+import 'ember-runtime/system/service'; // creates inject.service
 import ControllerMixin from 'ember-runtime/mixins/controller';
+import { HAS_BLOCK, RELATED_VIEW } from 'ember-views/system/link-to';
 
 import linkToTemplate from 'ember-htmlbars/templates/link-to';
 linkToTemplate.meta.revision = 'Ember@VERSION_STRING_PLACEHOLDER';
 
-var linkComponentClassNameBindings = ['active', 'loading', 'disabled'];
-if (isEnabled('ember-routing-transitioning-classes')) {
-  linkComponentClassNameBindings = ['active', 'loading', 'disabled', 'transitioningIn', 'transitioningOut'];
-}
 
 /**
   `Ember.LinkComponent` renders an element whose `click` event triggers a
@@ -47,13 +45,13 @@ var LinkComponent = EmberComponent.extend({
     @property currentWhen
     @private
   */
-  currentWhen: null,
+  currentWhen: deprecatingAlias('current-when', { id: 'ember-routing-view.deprecated-current-when', until: '3.0.0' }),
 
   /**
     Used to determine when this LinkComponent is active.
 
     @property currentWhen
-    @private
+    @public
   */
   'current-when': null,
 
@@ -62,7 +60,7 @@ var LinkComponent = EmberComponent.extend({
 
     @property title
     @default null
-    @private
+    @public
   **/
   title: null,
 
@@ -71,7 +69,7 @@ var LinkComponent = EmberComponent.extend({
 
     @property rel
     @default null
-    @private
+    @public
   **/
   rel: null,
 
@@ -80,7 +78,7 @@ var LinkComponent = EmberComponent.extend({
 
     @property tabindex
     @default null
-    @private
+    @public
   **/
   tabindex: null,
 
@@ -90,7 +88,7 @@ var LinkComponent = EmberComponent.extend({
     @since 1.8.0
     @property target
     @default null
-    @private
+    @public
   **/
   target: null,
 
@@ -135,7 +133,7 @@ var LinkComponent = EmberComponent.extend({
     @property replace
     @type Boolean
     @default false
-    @private
+    @public
   **/
   replace: false,
 
@@ -147,7 +145,7 @@ var LinkComponent = EmberComponent.extend({
     @property attributeBindings
     @type Array | String
     @default ['title', 'rel', 'tabindex', 'target']
-     @private
+    @public
   */
   attributeBindings: ['href', 'title', 'rel', 'tabindex', 'target'],
 
@@ -158,9 +156,9 @@ var LinkComponent = EmberComponent.extend({
     @property classNameBindings
     @type Array
     @default ['active', 'loading', 'disabled']
-     @private
+    @public
   */
-  classNameBindings: linkComponentClassNameBindings,
+  classNameBindings: ['active', 'loading', 'disabled', 'transitioningIn', 'transitioningOut'],
 
   /**
     By default the `{{link-to}}` helper responds to the `click` event. You
@@ -204,8 +202,8 @@ var LinkComponent = EmberComponent.extend({
     });
     ```
 
-    NOTE: If you do override `init` for a framework class like `Ember.View` or
-    `Ember.ArrayController`, be sure to call `this._super.apply(this, arguments)` in your
+    NOTE: If you do override `init` for a framework class like `Ember.View`,
+    be sure to call `this._super.apply(this, arguments)` in your
     `init` declaration! If you don't, Ember may not have an opportunity to
     do important setup work, and you'll see strange behavior in your
     application.
@@ -215,8 +213,6 @@ var LinkComponent = EmberComponent.extend({
   */
   init() {
     this._super(...arguments);
-
-    Ember.deprecate('Using currentWhen with {{link-to}} is deprecated in favor of `current-when`.', !this.currentWhen);
 
     // Map desired event name to invoke function
     var eventName = get(this, 'eventName');
@@ -320,7 +316,7 @@ var LinkComponent = EmberComponent.extend({
     }
 
     var routing = get(this, '_routing');
-    var targetRouteName = get(this, 'targetRouteName');
+    var targetRouteName = this._computeRouteNameWithQueryParams(get(this, 'targetRouteName'));
     var models = get(this, 'models');
     var queryParamValues = get(this, 'queryParams.values');
     var shouldReplace = get(this, 'attrs.replace');
@@ -341,7 +337,6 @@ var LinkComponent = EmberComponent.extend({
     @private
   */
   href: computed('models', 'targetRouteName', '_routing.currentState', function computeLinkComponentHref() {
-
     if (get(this, 'tagName') !== 'a') { return; }
 
     var targetRouteName = get(this, 'targetRouteName');
@@ -349,7 +344,7 @@ var LinkComponent = EmberComponent.extend({
 
     if (get(this, 'loading')) { return get(this, 'loadingHref'); }
 
-    targetRouteName = this._handleOnlyQueryParamsSupplied(targetRouteName);
+    targetRouteName = this._computeRouteNameWithQueryParams(targetRouteName);
 
     var routing = get(this, '_routing');
     var queryParams = get(this, 'queryParams.values');
@@ -365,13 +360,13 @@ var LinkComponent = EmberComponent.extend({
     }
   }),
 
-  _handleOnlyQueryParamsSupplied(route) {
+  _computeRouteNameWithQueryParams(route) {
     var params = this.attrs.params.slice();
     var lastParam = params[params.length - 1];
     if (lastParam && lastParam.isQueryParams) {
       params.pop();
     }
-    let onlyQueryParamsSupplied = (params.length === 0);
+    let onlyQueryParamsSupplied = (this[HAS_BLOCK] ? params.length === 0 : params.length === 1);
     if (onlyQueryParamsSupplied) {
       var appController = this.container.lookup('controller:application');
       if (appController) {
@@ -422,19 +417,7 @@ var LinkComponent = EmberComponent.extend({
       this.set('disabled', attrs.disabledWhen);
     }
 
-    var currentWhen = attrs['current-when'];
-
-    if (attrs.currentWhen) {
-      Ember.deprecate('Using currentWhen with {{link-to}} is deprecated in favor of `current-when`.', !attrs.currentWhen);
-      currentWhen = attrs.currentWhen;
-    }
-
-    if (currentWhen) {
-      this.set('currentWhen', currentWhen);
-    }
-
-    // TODO: Change to built-in hasBlock once it's available
-    if (!attrs.hasBlock) {
+    if (!this[HAS_BLOCK]) {
       this.set('linkTitle', params.shift());
     }
 
@@ -446,7 +429,12 @@ var LinkComponent = EmberComponent.extend({
       var value = params[i];
 
       while (ControllerMixin.detect(value)) {
-        Ember.deprecate('Providing `{{link-to}}` with a param that is wrapped in a controller is deprecated. Please update `' + attrs.view + '` to use `{{link-to "post" someController.model}}` instead.');
+        Ember.deprecate(
+          'Providing `{{link-to}}` with a param that is wrapped in a controller is deprecated. ' +
+            (attrs[RELATED_VIEW] ? 'Please update `' + attrs[RELATED_VIEW] + '` to use `{{link-to "post" someController.model}}` instead.' : ''),
+          false,
+          { id: 'ember-routing-views.controller-wrapped-param', until: '3.0.0' }
+        );
         value = value.get('model');
       }
 
@@ -455,7 +443,7 @@ var LinkComponent = EmberComponent.extend({
 
     let targetRouteName;
     let models = [];
-    targetRouteName = this._handleOnlyQueryParamsSupplied(params[0]);
+    targetRouteName = this._computeRouteNameWithQueryParams(params[0]);
 
     for (let i = 1; i < params.length; i++) {
       models.push(params[i]);
@@ -475,7 +463,7 @@ LinkComponent.toString = function() { return 'LinkComponent'; };
 function computeActive(view, routerState) {
   if (get(view, 'loading')) { return false; }
 
-  var currentWhen = get(view, 'currentWhen');
+  var currentWhen = get(view, 'current-when');
   var isCurrentWhenSpecified = !!currentWhen;
   currentWhen = currentWhen || get(view, 'targetRouteName');
   currentWhen = currentWhen.split(' ');
@@ -489,7 +477,7 @@ function computeActive(view, routerState) {
 }
 
 function modelsAreLoaded(models) {
-  for (var i=0, l=models.length; i<l; i++) {
+  for (var i = 0, l = models.length; i < l; i++) {
     if (models[i] == null) { return false; }
   }
 
@@ -514,5 +502,9 @@ function getResolvedQueryParams(queryParamsObject, targetRouteName) {
 
   return resolvedQueryParams;
 }
+
+LinkComponent.reopenClass({
+  positionalParams: 'params'
+});
 
 export default LinkComponent;

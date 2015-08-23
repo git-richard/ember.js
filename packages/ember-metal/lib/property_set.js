@@ -10,12 +10,8 @@ import { defineProperty } from 'ember-metal/properties';
 import EmberError from 'ember-metal/error';
 import {
   isPath,
-  isGlobalPath
+  hasThis as pathHasThis
 } from 'ember-metal/path_cache';
-
-import { symbol } from 'ember-metal/utils';
-export let INTERCEPT_SET = symbol('INTERCEPT_SET');
-export let UNHANDLED_SET = symbol('UNHANDLED_SET');
 
 /**
   Sets the value of a property on an object, respecting computed properties
@@ -32,26 +28,12 @@ export let UNHANDLED_SET = symbol('UNHANDLED_SET');
   @public
 */
 export function set(obj, keyName, value, tolerant) {
-  if (typeof obj === 'string') {
-    Ember.assert(`Path '${obj}' must be global if no obj is given.`, isGlobalPath(obj));
-    value = keyName;
-    keyName = obj;
-    obj = Ember.lookup;
-  }
-
-  Ember.assert(`Cannot call set with '${keyName}' key.`, !!keyName);
-
-  if (obj === Ember.lookup) {
-    return setPath(obj, keyName, value, tolerant);
-  }
-
-  // This path exists purely to implement backwards-compatible
-  // effects (specifically, setting a property on a view may
-  // invoke a mutator on `attrs`).
-  if (obj && typeof obj[INTERCEPT_SET] === 'function') {
-    let result = obj[INTERCEPT_SET](obj, keyName, value, tolerant);
-    if (result !== UNHANDLED_SET) { return result; }
-  }
+  Ember.assert(
+    `Set must be called with three or four arguments; an object, a property key, a value and tolerant true/false`,
+    arguments.length === 3 || arguments.length === 4);
+  Ember.assert(`Cannot call set with '${keyName}' on an undefined object.`, obj !== undefined && obj !== null);
+  Ember.assert(`The key provided to set must be a string, you passed ${keyName}`, typeof keyName === 'string');
+  Ember.assert(`'this' in paths is not supported`, !pathHasThis(keyName));
 
   var meta, possibleDesc, desc;
   if (obj) {
@@ -61,18 +43,16 @@ export function set(obj, keyName, value, tolerant) {
   }
 
   var isUnknown, currentValue;
-  if ((!obj || desc === undefined) && isPath(keyName)) {
+  if (desc === undefined && isPath(keyName)) {
     return setPath(obj, keyName, value, tolerant);
   }
 
-  Ember.assert('You need to provide an object and key to `set`.', !!obj && keyName !== undefined);
   Ember.assert('calling set on destroyed object', !obj.isDestroyed);
 
   if (desc) {
     desc.set(obj, keyName, value);
   } else {
-
-    if (obj !== null && value !== undefined && typeof obj === 'object' && obj[keyName] === value) {
+    if (value !== undefined && typeof obj === 'object' && obj[keyName] === value) {
       return value;
     }
 
@@ -83,10 +63,10 @@ export function set(obj, keyName, value, tolerant) {
     // `setUnknownProperty` method exists on the object
     if (isUnknown && 'function' === typeof obj.setUnknownProperty) {
       obj.setUnknownProperty(keyName, value);
-    } else if (meta && meta.watching[keyName] > 0) {
+    } else if (meta && meta.peekWatching(keyName) > 0) {
       if (meta.proto !== obj) {
         if (isEnabled('mandatory-setter')) {
-          currentValue = meta.values[keyName];
+          currentValue = meta.peekValues(keyName);
         } else {
           currentValue = obj[keyName];
         }
@@ -101,7 +81,7 @@ export function set(obj, keyName, value, tolerant) {
           ) {
             defineProperty(obj, keyName, null, value); // setup mandatory setter
           } else {
-            meta.values[keyName] = value;
+            meta.writableValues()[keyName] = value;
           }
         } else {
           obj[keyName] = value;
@@ -125,7 +105,7 @@ function setPath(root, path, value, tolerant) {
   keyName = path.slice(path.lastIndexOf('.') + 1);
 
   // get the first part of the part
-  path    = (path === keyName) ? keyName : path.slice(0, path.length-(keyName.length+1));
+  path    = (path === keyName) ? keyName : path.slice(0, path.length - (keyName.length + 1));
 
   // unless the path is this, look up the first part to
   // get the root
@@ -141,7 +121,7 @@ function setPath(root, path, value, tolerant) {
     if (tolerant) {
       return;
     } else {
-      throw new EmberError('Property set failed: object in path "'+path+'" could not be found or was destroyed.');
+      throw new EmberError('Property set failed: object in path "' + path + '" could not be found or was destroyed.');
     }
   }
 

@@ -15,13 +15,15 @@ import EmberView from 'ember-views/views/view';
 import jQuery from 'ember-views/system/jquery';
 import compile from 'ember-template-compiler/system/compile';
 
-var trim = jQuery.trim;
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
 
+var trim = jQuery.trim;
 
 var view;
 
 var originalLookup = Ember.lookup;
-var TemplateTests, registry, container, lookup;
+var TemplateTests, registry, container, lookup, originalViewKeyword;
 
 
 function nthChild(view, nth) {
@@ -34,8 +36,10 @@ function firstGrandchild(view) {
   return get(get(view, 'childViews').objectAt(0), 'childViews').objectAt(0);
 }
 
-QUnit.module('collection helper', {
+QUnit.module('collection helper [LEGACY]', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
+
     Ember.lookup = lookup = {};
     lookup.TemplateTests = TemplateTests = Namespace.create();
     registry = new Registry();
@@ -52,6 +56,8 @@ QUnit.module('collection helper', {
 
     Ember.lookup = lookup = originalLookup;
     TemplateTests = null;
+
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -72,26 +78,6 @@ QUnit.test('Collection views that specify an example view class have their child
   runAppend(view);
 
   ok(firstGrandchild(view).isCustom, 'uses the example view class');
-});
-
-QUnit.test('itemViewClass works in the #collection helper with a global (DEPRECATED)', function() {
-  TemplateTests.ExampleItemView = EmberView.extend({
-    isAlsoCustom: true
-  });
-
-  view = EmberView.create({
-    exampleController: ArrayProxy.create({
-      content: A(['alpha'])
-    }),
-    template: compile('{{#collection content=view.exampleController itemViewClass=TemplateTests.ExampleItemView}}beta{{/collection}}')
-  });
-
-  var deprecation = /Global lookup of TemplateTests from a Handlebars template is deprecated/;
-  expectDeprecation(function() {
-    runAppend(view);
-  }, deprecation);
-
-  ok(firstGrandchild(view).isAlsoCustom, 'uses the example view class specified in the #collection helper');
 });
 
 QUnit.test('itemViewClass works in the #collection helper with a property', function() {
@@ -200,6 +186,7 @@ QUnit.test('empty views should be removed when content is added to the collectio
   });
 
   view = EmberView.create({
+    _viewRegistry: {},
     listView: ListView,
     listController: listController,
     template: compile('{{#collection view.listView content=view.listController tagName="table"}} <td>{{view.content.title}}</td> {{/collection}}')
@@ -433,7 +420,7 @@ QUnit.test('should work inside a bound {{#if}}', function() {
 
 QUnit.test('should pass content as context when using {{#each}} helper [DEPRECATED]', function() {
   view = EmberView.create({
-    template: compile('{{#each view.releases}}Mac OS X {{version}}: {{name}} {{/each}}'),
+    template: compile('{{#each view.releases as |release|}}Mac OS X {{release.version}}: {{release.name}} {{/each}}'),
 
     releases: A([
                 { version: '10.7',
@@ -445,9 +432,7 @@ QUnit.test('should pass content as context when using {{#each}} helper [DEPRECAT
               ])
   });
 
-  expectDeprecation(function() {
-    runAppend(view);
-  }, 'Using the context switching form of {{each}} is deprecated. Please use the keyword form (`{{#each items as |item|}}`) instead.');
+  runAppend(view);
 
   equal(view.$().text(), 'Mac OS X 10.7: Lion Mac OS X 10.6: Snow Leopard Mac OS X 10.5: Leopard ', 'prints each item in sequence');
 });
@@ -531,7 +516,7 @@ QUnit.test('should render nested collections', function() {
   var container = registry.container();
   registry.register('view:inner-list', CollectionView.extend({
     tagName: 'ul',
-    content: A(['one','two','three'])
+    content: A(['one', 'two', 'three'])
   }));
 
   registry.register('view:outer-list', CollectionView.extend({
@@ -549,7 +534,6 @@ QUnit.test('should render nested collections', function() {
   equal(view.$('ul.outer > li').length, 1, 'renders the outer list with correct number of items');
   equal(view.$('ul.inner').length, 1, 'the inner list exsits');
   equal(view.$('ul.inner > li').length, 3, 'renders the inner list with correct number of items');
-
 });
 
 QUnit.test('should render multiple, bound nested collections (#68)', function() {
@@ -557,7 +541,7 @@ QUnit.test('should render multiple, bound nested collections (#68)', function() 
 
   run(function() {
     TemplateTests.contentController = ArrayProxy.create({
-      content: A(['foo','bar'])
+      content: A(['foo', 'bar'])
     });
 
     var InnerList = CollectionView.extend({
@@ -569,7 +553,7 @@ QUnit.test('should render multiple, bound nested collections (#68)', function() 
       innerListView: InnerList,
       template: compile('{{#collection view.innerListView class="inner"}}{{content}}{{/collection}}{{content}}'),
       innerListContent: computed(function() {
-        return A([1,2,3]);
+        return A([1, 2, 3]);
       })
     });
 
@@ -625,7 +609,7 @@ QUnit.test('should allow view objects to be swapped out without throwing an erro
   run(function() {
     dataset = EmberObject.create({
       ready: true,
-      items: A([1,2,3])
+      items: A([1, 2, 3])
     });
     TemplateTests.datasetController.set('dataset', dataset);
   });

@@ -9,12 +9,8 @@ import View from 'ember-views/views/view';
 import EmberArray from 'ember-runtime/mixins/array';
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
-import { fmt } from 'ember-runtime/system/string';
 import { computed } from 'ember-metal/computed';
-import {
-  observer,
-  beforeObserver
-} from 'ember-metal/mixin';
+import { observer } from 'ember-metal/mixin';
 import { readViewFactory } from 'ember-views/streams/utils';
 import EmptyViewSupport from 'ember-views/mixins/empty_view_support';
 
@@ -53,7 +49,7 @@ import EmptyViewSupport from 'ember-views/mixins/empty_view_support';
     classNames: ['a-collection'],
     content: ['A','B','C'],
     itemViewClass: Ember.View.extend({
-      template: Ember.Handlebars.compile("the letter: {{view.content}}")
+      template: Ember.HTMLBars.compile("the letter: {{view.content}}")
     })
   });
   ```
@@ -88,7 +84,7 @@ import EmptyViewSupport from 'ember-views/mixins/empty_view_support';
     tagName: 'ul',
     content: ['A','B','C'],
     itemViewClass: Ember.View.extend({
-      template: Ember.Handlebars.compile("the letter: {{view.content}}")
+      template: Ember.HTMLBars.compile("the letter: {{view.content}}")
     })
   });
   ```
@@ -148,7 +144,7 @@ import EmptyViewSupport from 'ember-views/mixins/empty_view_support';
     classNames: ['nothing'],
     content: null,
     emptyView: Ember.View.extend({
-      template: Ember.Handlebars.compile("The collection is empty")
+      template: Ember.HTMLBars.compile("The collection is empty")
     })
   });
   ```
@@ -216,21 +212,6 @@ var CollectionView = ContainerView.extend(EmptyViewSupport, {
   },
 
   /**
-    Invoked when the content property is about to change. Notifies observers that the
-    entire array content will change.
-
-    @private
-    @method _contentWillChange
-  */
-  _contentWillChange: beforeObserver('content', function() {
-    var content = this.get('content');
-
-    if (content) { content.removeArrayObserver(this); }
-    var len = content ? get(content, 'length') : 0;
-    this.arrayWillChange(content, 0, len);
-  }),
-
-  /**
     Check to make sure that the content has changed, and if so,
     update the children directly. This is always scheduled
     asynchronously, to allow the element to be created before
@@ -240,14 +221,20 @@ var CollectionView = ContainerView.extend(EmptyViewSupport, {
     @method _contentDidChange
   */
   _contentDidChange: observer('content', function() {
+    var prevContent = this._prevContent;
+    if (prevContent) { prevContent.removeArrayObserver(this); }
+    var len = prevContent ? get(prevContent, 'length') : 0;
+    this.arrayWillChange(prevContent, 0, len);
+
     var content = get(this, 'content');
 
     if (content) {
+      this._prevContent = content;
       this._assertArrayLike(content);
       content.addArrayObserver(this);
     }
 
-    var len = content ? get(content, 'length') : 0;
+    len = content ? get(content, 'length') : 0;
     this.arrayDidChange(content, 0, null, len);
   }),
 
@@ -258,7 +245,7 @@ var CollectionView = ContainerView.extend(EmptyViewSupport, {
     @method _assertArrayLike
   */
   _assertArrayLike(content) {
-    Ember.assert(fmt('an Ember.CollectionView\'s content must implement Ember.Array. You passed %@', [content]), EmberArray.detect(content));
+    Ember.assert(`an Ember.CollectionView's content must implement Ember.Array. You passed ${content}`, EmberArray.detect(content));
   },
 
   /**
@@ -325,7 +312,7 @@ var CollectionView = ContainerView.extend(EmptyViewSupport, {
 
       itemViewClass = readViewFactory(itemViewClass, this.container);
 
-      for (idx = start; idx < start+added; idx++) {
+      for (idx = start; idx < start + added; idx++) {
         item = content.objectAt(idx);
         itemViewProps._context = this.keyword ? this.get('context') : item;
         itemViewProps.content = item;
@@ -375,7 +362,7 @@ var CollectionView = ContainerView.extend(EmptyViewSupport, {
     this._itemViewProps = itemProps;
     var childViews = get(this, 'childViews');
 
-    for (var i=0, l=childViews.length; i<l; i++) {
+    for (var i = 0, l = childViews.length; i < l; i++) {
       childViews[i].setProperties(itemProps);
     }
 
@@ -450,4 +437,31 @@ function buildItemViewProps(template, attrs) {
   return props;
 }
 
+function viewDeprecationMessage() {
+  Ember.deprecate(`Ember.CollectionView is deprecated. Consult the Deprecations Guide for a migration strategy.`,
+                  !!Ember.ENV._ENABLE_LEGACY_VIEW_SUPPORT,
+                  {
+                    url: 'http://emberjs.com/deprecations/v1.x/#toc_ember-collectionview',
+                    id: 'ember-views.collection-view-deprecated',
+                    until: '2.4.0'
+                  });
+}
+
+var DeprecatedCollectionView = CollectionView.extend({
+  init() {
+    viewDeprecationMessage();
+    this._super(...arguments);
+  }
+});
+
+DeprecatedCollectionView.reopen = function() {
+  viewDeprecationMessage();
+  CollectionView.reopen(...arguments);
+  return this;
+};
+
+DeprecatedCollectionView.CONTAINER_MAP = CONTAINER_MAP;
+
 export default CollectionView;
+
+export { DeprecatedCollectionView };

@@ -29,7 +29,7 @@ import Enumerable from 'ember-runtime/mixins/enumerable';
   This mixin defines the API for modifying array-like objects. These methods
   can be applied only to a collection that keeps its items in an ordered set.
   It builds upon the Array mixin and adds methods to modify the array.
-  Concrete implementations of this class include ArrayProxy and ArrayController.
+  One concrete implementations of this class include ArrayProxy.
 
   It is important to use the methods in this class to modify arrays so that
   changes are observable. This allows the binding system in Ember to function
@@ -141,7 +141,6 @@ export default Mixin.create(EmberArray, MutableEnumerable, {
   */
   removeAt(start, len) {
     if ('number' === typeof start) {
-
       if ((start < 0) || (start >= get(this, 'length'))) {
         throw new EmberError(OUT_OF_RANGE_EXCEPTION);
       }
@@ -222,8 +221,8 @@ export default Mixin.create(EmberArray, MutableEnumerable, {
       return null;
     }
 
-    var ret = this.objectAt(len-1);
-    this.removeAt(len-1, 1);
+    var ret = this.objectAt(len - 1);
+    this.removeAt(len - 1, 1);
     return ret;
   },
 

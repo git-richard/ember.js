@@ -6,11 +6,16 @@ import EmberView from 'ember-views/views/view';
 import { compile } from 'ember-template-compiler';
 import { registerHelper } from 'ember-htmlbars/helpers';
 
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
 var originalLookup = Ember.lookup;
+var originalViewKeyword;
 var lookup, view;
 
 QUnit.module('views/view/view_lifecycle_test - pre-render', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     Ember.lookup = lookup = {};
   },
 
@@ -21,6 +26,7 @@ QUnit.module('views/view/view_lifecycle_test - pre-render', {
       });
     }
     Ember.lookup = originalLookup;
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -87,15 +93,15 @@ QUnit.test('should not affect rendering if destroyElement is called before initi
 
 QUnit.module('views/view/view_lifecycle_test - in render', {
   setup() {
-
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
   },
-
   teardown() {
     if (view) {
       run(function() {
         view.destroy();
       });
     }
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -209,7 +215,7 @@ QUnit.test('should replace DOM representation if rerender() is called after elem
   run(function() {
     view = EmberView.extend({
       rerender() {
-        this._super.apply(this, arguments);
+        this._super(...arguments);
       }
     }).create({
       template: compile('Do not taunt happy fun {{unbound view.shape}}'),
@@ -361,10 +367,9 @@ QUnit.test('trigger rerender on a view in the inDOM state keeps its state as inD
     view.rerender();
   });
 
-  equal(view.currentState, view._states.inDOM, 'the view is still in the inDOM state');
+  equal(view._currentState, view._states.inDOM, 'the view is still in the inDOM state');
 
   run(function() {
     view.destroy();
   });
 });
-

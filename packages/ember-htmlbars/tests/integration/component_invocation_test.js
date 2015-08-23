@@ -5,7 +5,8 @@ import Registry from 'container/registry';
 import jQuery from 'ember-views/system/jquery';
 import compile from 'ember-template-compiler/system/compile';
 import ComponentLookup from 'ember-views/component_lookup';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
+import GlimmerComponent from 'ember-htmlbars/glimmer-component';
 import { runAppend, runDestroy } from 'ember-runtime/tests/utils';
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
@@ -62,6 +63,15 @@ QUnit.test('non-block without properties', function() {
   runAppend(view);
 
   equal(jQuery('#qunit-fixture').text(), 'In layout');
+});
+
+QUnit.test('GlimmerComponent cannot be invoked with curly braces', function() {
+  registry.register('template:components/non-block', compile('In layout'));
+  registry.register('component:non-block', GlimmerComponent.extend());
+
+  expectAssertion(function() {
+    view = appendViewFor('{{non-block}}');
+  }, /cannot invoke the 'non-block' component with curly braces/);
 });
 
 QUnit.test('block without properties', function() {
@@ -250,61 +260,6 @@ QUnit.test('with ariaRole specified', function() {
   equal(view.$('#aria-test').attr('role'), 'main', 'role attribute is applied');
 });
 
-QUnit.test('`template` is true when block supplied', function() {
-  expect(3);
-
-  let innerComponent;
-  registry.register('component:with-block', Component.extend({
-    init() {
-      this._super(...arguments);
-      innerComponent = this;
-    }
-  }));
-
-  view = EmberView.extend({
-    template: compile('{{#with-block}}In template{{/with-block}}'),
-    container: container
-  }).create();
-
-  runAppend(view);
-
-  equal(jQuery('#qunit-fixture').text(), 'In template');
-
-  let template;
-  expectDeprecation(function() {
-    template = get(innerComponent, 'template');
-  }, /Accessing 'template' in .+ is deprecated. To determine if a block was specified to .+ please use '{{#if hasBlock}}' in the components layout./);
-
-
-  ok(template, 'template property is truthy when a block was provided');
-});
-
-QUnit.test('`template` is false when no block supplied', function() {
-  expect(2);
-
-  let innerComponent;
-  registry.register('component:without-block', Component.extend({
-    init() {
-      this._super(...arguments);
-      innerComponent = this;
-    }
-  }));
-
-  view = EmberView.extend({
-    template: compile('{{without-block}}'),
-    container: container
-  }).create();
-
-  runAppend(view);
-
-  let template;
-  expectDeprecation(function() {
-    template = get(innerComponent, 'template');
-  }, /Accessing 'template' in .+ is deprecated. To determine if a block was specified to .+ please use '{{#if hasBlock}}' in the components layout./);
-
-  ok(!template, 'template property is falsey when a block was not provided');
-});
-
 QUnit.test('`template` specified in a component is overridden by block', function() {
   expect(1);
 
@@ -323,92 +278,73 @@ QUnit.test('`template` specified in a component is overridden by block', functio
   equal(view.$().text(), 'Whoop, whoop!', 'block provided always overrides template property');
 });
 
-QUnit.test('template specified inline is available from Views looked up as components', function() {
-  expect(2);
+QUnit.test('hasBlock is true when block supplied', function() {
+  expect(1);
 
-  registry.register('component:without-block', EmberView.extend({
-    template: compile('Whoop, whoop!')
-  }));
+  registry.register('template:components/with-block', compile('{{#if hasBlock}}{{yield}}{{else}}No Block!{{/if}}'));
 
   view = EmberView.extend({
-    template: compile('{{without-block}}'),
+    template: compile('{{#with-block}}In template{{/with-block}}'),
     container: container
   }).create();
 
-  expectDeprecation(function() {
-    runAppend(view);
-  }, 'Using deprecated `template` property on a Component.');
+  runAppend(view);
 
-  equal(view.$().text(), 'Whoop, whoop!', 'template inline works properly');
+  equal(jQuery('#qunit-fixture').text(), 'In template');
 });
 
-if (isEnabled('ember-views-component-block-info')) {
-  QUnit.test('hasBlock is true when block supplied', function() {
-    expect(1);
+QUnit.test('hasBlock is false when no block supplied', function() {
+  expect(1);
 
-    registry.register('template:components/with-block', compile('{{#if hasBlock}}{{yield}}{{else}}No Block!{{/if}}'));
+  registry.register('template:components/with-block', compile('{{#if hasBlock}}{{yield}}{{else}}No Block!{{/if}}'));
 
-    view = EmberView.extend({
-      template: compile('{{#with-block}}In template{{/with-block}}'),
-      container: container
-    }).create();
+  view = EmberView.extend({
+    template: compile('{{with-block}}'),
+    container: container
+  }).create();
 
-    runAppend(view);
+  runAppend(view);
 
-    equal(jQuery('#qunit-fixture').text(), 'In template');
-  });
+  equal(jQuery('#qunit-fixture').text(), 'No Block!');
+});
 
-  QUnit.test('hasBlock is false when no block supplied', function() {
-    expect(1);
+QUnit.test('hasBlockParams is true when block param supplied', function() {
+  expect(1);
 
-    registry.register('template:components/with-block', compile('{{#if hasBlock}}{{yield}}{{else}}No Block!{{/if}}'));
+  registry.register('template:components/with-block', compile('{{#if hasBlockParams}}{{yield this}} - In Component{{else}}{{yield}} No Block!{{/if}}'));
 
-    view = EmberView.extend({
-      template: compile('{{with-block}}'),
-      container: container
-    }).create();
+  view = EmberView.extend({
+    template: compile('{{#with-block as |something|}}In template{{/with-block}}'),
+    container: container
+  }).create();
 
-    runAppend(view);
+  runAppend(view);
 
-    equal(jQuery('#qunit-fixture').text(), 'No Block!');
-  });
+  equal(jQuery('#qunit-fixture').text(), 'In template - In Component');
+});
 
-  QUnit.test('hasBlockParams is true when block param supplied', function() {
-    expect(1);
+QUnit.test('hasBlockParams is false when no block param supplied', function() {
+  expect(1);
 
-    registry.register('template:components/with-block', compile('{{#if hasBlockParams}}{{yield this}} - In Component{{else}}{{yield}} No Block!{{/if}}'));
+  registry.register('template:components/with-block', compile('{{#if hasBlockParams}}{{yield this}}{{else}}{{yield}} No Block Param!{{/if}}'));
 
-    view = EmberView.extend({
-      template: compile('{{#with-block as |something|}}In template{{/with-block}}'),
-      container: container
-    }).create();
+  view = EmberView.extend({
+    template: compile('{{#with-block}}In block{{/with-block}}'),
+    container: container
+  }).create();
 
-    runAppend(view);
+  runAppend(view);
 
-    equal(jQuery('#qunit-fixture').text(), 'In template - In Component');
-  });
-
-  QUnit.test('hasBlockParams is false when no block param supplied', function() {
-    expect(1);
-
-    registry.register('template:components/with-block', compile('{{#if hasBlockParams}}{{yield this}}{{else}}{{yield}} No Block Param!{{/if}}'));
-
-    view = EmberView.extend({
-      template: compile('{{#with-block}}In block{{/with-block}}'),
-      container: container
-    }).create();
-
-    runAppend(view);
-
-    equal(jQuery('#qunit-fixture').text(), 'In block No Block Param!');
-  });
-}
+  equal(jQuery('#qunit-fixture').text(), 'In block No Block Param!');
+});
 
 QUnit.test('static named positional parameters', function() {
-  registry.register('template:components/sample-component', compile('{{attrs.name}}{{attrs.age}}'));
-  registry.register('component:sample-component', Component.extend({
+  var SampleComponent = Component.extend();
+  SampleComponent.reopenClass({
     positionalParams: ['name', 'age']
-  }));
+  });
+  registry.register('template:components/sample-component', compile('{{attrs.name}}{{attrs.age}}'));
+  registry.register('component:sample-component', SampleComponent);
 
   view = EmberView.extend({
     layout: compile('{{sample-component "Quint" 4}}'),
@@ -421,10 +357,13 @@ QUnit.test('static named positional parameters', function() {
 });
 
 QUnit.test('dynamic named positional parameters', function() {
-  registry.register('template:components/sample-component', compile('{{attrs.name}}{{attrs.age}}'));
-  registry.register('component:sample-component', Component.extend({
+  var SampleComponent = Component.extend();
+  SampleComponent.reopenClass({
     positionalParams: ['name', 'age']
-  }));
+  });
+
+  registry.register('template:components/sample-component', compile('{{attrs.name}}{{attrs.age}}'));
+  registry.register('component:sample-component', SampleComponent);
 
   view = EmberView.extend({
     layout: compile('{{sample-component myName myAge}}'),
@@ -436,6 +375,7 @@ QUnit.test('dynamic named positional parameters', function() {
   }).create();
 
   runAppend(view);
+
   equal(jQuery('#qunit-fixture').text(), 'Quint4');
   run(function() {
     set(view.context, 'myName', 'Edward');
@@ -446,10 +386,13 @@ QUnit.test('dynamic named positional parameters', function() {
 });
 
 QUnit.test('static arbitrary number of positional parameters', function() {
-  registry.register('template:components/sample-component', compile('{{#each attrs.names as |name|}}{{name}}{{/each}}'));
-  registry.register('component:sample-component', Component.extend({
+  var SampleComponent = Component.extend();
+  SampleComponent.reopenClass({
     positionalParams: 'names'
-  }));
+  });
+
+  registry.register('template:components/sample-component', compile('{{#each attrs.names as |name|}}{{name}}{{/each}}'));
+  registry.register('component:sample-component', SampleComponent);
 
   view = EmberView.extend({
     layout: compile('{{sample-component "Foo" 4 "Bar" id="args-3"}}{{sample-component "Foo" 4 "Bar" 5 "Baz" id="args-5"}}{{component "sample-component" "Foo" 4 "Bar" 5 "Baz" id="helper"}}'),
@@ -464,10 +407,12 @@ QUnit.test('static arbitrary number of positional parameters', function() {
 });
 
 QUnit.test('dynamic arbitrary number of positional parameters', function() {
-  registry.register('template:components/sample-component', compile('{{#each attrs.names as |name|}}{{name}}{{/each}}'));
-  registry.register('component:sample-component', Component.extend({
-    positionalParams: 'names'
-  }));
+  var SampleComponent = Component.extend();
+  SampleComponent.reopenClass({
+    positionalParams: 'n'
+  });
+  registry.register('template:components/sample-component', compile('{{#each attrs.n as |name|}}{{name}}{{/each}}'));
+  registry.register('component:sample-component', SampleComponent);
 
   view = EmberView.extend({
     layout: compile('{{sample-component user1 user2 id="direct"}}{{component "sample-component" user1 user2 id="helper"}}'),
@@ -479,6 +424,7 @@ QUnit.test('dynamic arbitrary number of positional parameters', function() {
   }).create();
 
   runAppend(view);
+
   equal(view.$('#direct').text(), 'Foo4');
   equal(view.$('#helper').text(), 'Foo4');
   run(function() {
@@ -488,6 +434,13 @@ QUnit.test('dynamic arbitrary number of positional parameters', function() {
 
   equal(view.$('#direct').text(), 'Bar5');
   equal(view.$('#helper').text(), 'Bar5');
+
+  run(function() {
+    set(view.context, 'user2', '6');
+  });
+
+  equal(view.$('#direct').text(), 'Bar6');
+  equal(view.$('#helper').text(), 'Bar6');
 });
 
 QUnit.test('moduleName is available on _renderNode when a layout is present', function() {
@@ -532,32 +485,33 @@ QUnit.test('moduleName is available on _renderNode when no layout is present', f
   runAppend(view);
 });
 
-if (isEnabled('ember-htmlbars-component-helper')) {
-  QUnit.test('{{component}} helper works with positional params', function() {
-    registry.register('template:components/sample-component', compile('{{attrs.name}}{{attrs.age}}'));
-    registry.register('component:sample-component', Component.extend({
-      positionalParams: ['name', 'age']
-    }));
-
-    view = EmberView.extend({
-      layout: compile('{{component "sample-component" myName myAge}}'),
-      container: container,
-      context: {
-        myName: 'Quint',
-        myAge: 4
-      }
-    }).create();
-
-    runAppend(view);
-    equal(jQuery('#qunit-fixture').text(), 'Quint4');
-    run(function() {
-      set(view.context, 'myName', 'Edward');
-      set(view.context, 'myAge', '5');
-    });
-
-    equal(jQuery('#qunit-fixture').text(), 'Edward5');
+QUnit.test('{{component}} helper works with positional params', function() {
+  var SampleComponent = Component.extend();
+  SampleComponent.reopenClass({
+    positionalParams: ['name', 'age']
   });
-}
+
+  registry.register('template:components/sample-component', compile('{{attrs.name}}{{attrs.age}}'));
+  registry.register('component:sample-component', SampleComponent);
+
+  view = EmberView.extend({
+    layout: compile('{{component "sample-component" myName myAge}}'),
+    container: container,
+    context: {
+      myName: 'Quint',
+      myAge: 4
+    }
+  }).create();
+
+  runAppend(view);
+  equal(jQuery('#qunit-fixture').text(), 'Quint4');
+  run(function() {
+    set(view.context, 'myName', 'Edward');
+    set(view.context, 'myAge', '5');
+  });
+
+  equal(jQuery('#qunit-fixture').text(), 'Edward5');
+});
 
 QUnit.test('yield to inverse', function() {
   registry.register('template:components/my-if', compile('{{#if predicate}}Yes:{{yield someValue}}{{else}}No:{{yield to="inverse"}}{{/if}}'));
@@ -644,76 +598,6 @@ QUnit.test('non-expression hasBlockParams', function() {
   equal(jQuery('#qunit-fixture #expect-yes').text(), 'Yes');
 });
 
-QUnit.test('implementing `render` allows pushing into a string buffer', function() {
-  expect(1);
-
-  registry.register('component:non-block', Component.extend({
-    render(buffer) {
-      buffer.push('<span id="zomg">Whoop!</span>');
-    }
-  }));
-
-  view = EmberView.extend({
-    template: compile('{{non-block}}'),
-    container: container
-  }).create();
-
-  runAppend(view);
-
-  equal(view.$('#zomg').text(), 'Whoop!');
-});
-
-QUnit.test('comopnent should rerender when a property is changed during children\'s rendering', function() {
-  expectDeprecation(/twice in a single render/);
-
-  var outer, middle;
-
-  registry.register('component:x-outer', Component.extend({
-    value: 1,
-    grabReference: Ember.on('init', function() {
-      outer = this;
-    })
-  }));
-
-  registry.register('component:x-middle', Component.extend({
-    grabReference: Ember.on('init', function() {
-      middle = this;
-    })
-  }));
-
-  registry.register('component:x-inner', Component.extend({
-    pushDataUp: Ember.observer('value', function() {
-      middle.set('value', this.get('value'));
-    })
-  }));
-
-  registry.register('template:components/x-outer', compile('{{#x-middle}}{{x-inner value=value}}{{/x-middle}}'));
-  registry.register('template:components/x-middle', compile('<div id="middle-value">{{value}}</div>{{yield}}'));
-  registry.register('template:components/x-inner', compile('<div id="inner-value">{{value}}</div>'));
-
-
-  view = EmberView.extend({
-    template: compile('{{x-outer}}'),
-    container: container
-  }).create();
-
-  runAppend(view);
-
-  equal(view.$('#inner-value').text(), '1', 'initial render of inner');
-  equal(view.$('#middle-value').text(), '1', 'initial render of middle');
-
-  run(() => outer.set('value', 2));
-
-  equal(view.$('#inner-value').text(), '2', 'second render of inner');
-  equal(view.$('#middle-value').text(), '2', 'second render of middle');
-
-  run(() => outer.set('value', 3));
-
-  equal(view.$('#inner-value').text(), '3', 'third render of inner');
-  equal(view.$('#middle-value').text(), '3', 'third render of middle');
-
-});
-
 QUnit.test('components in template of a yielding component should have the proper parentView', function() {
   var outer, innerTemplate, innerLayout;
 
@@ -749,6 +633,37 @@ QUnit.test('components in template of a yielding component should have the prope
 
   equal(innerTemplate.parentView, outer, 'receives the wrapping component as its parentView in template blocks');
   equal(innerLayout.parentView, outer, 'receives the wrapping component as its parentView in layout');
+  equal(outer.parentView, view, 'x-outer receives the ambient scope as its parentView');
+});
+
+QUnit.test('newly-added sub-components get correct parentView', function() {
+  var outer, inner;
+
+  registry.register('component:x-outer', Component.extend({
+    init() {
+      this._super(...arguments);
+      outer = this;
+    }
+  }));
+
+  registry.register('component:x-inner', Component.extend({
+    init() {
+      this._super(...arguments);
+      inner = this;
+    }
+  }));
+
+  view = EmberView.extend({
+    template: compile('{{#x-outer}}{{#if view.showInner}}{{x-inner}}{{/if}}{{/x-outer}}'),
+    container: container,
+    showInner: false
+  }).create();
+
+  runAppend(view);
+
+  run(() => { view.set('showInner', true); });
+
+  equal(inner.parentView, outer, 'receives the wrapping component as its parentView in template blocks');
   equal(outer.parentView, view, 'x-outer receives the ambient scope as its parentView');
 });
 
@@ -793,7 +708,7 @@ QUnit.test('components should receive the viewRegistry from the parent view', fu
   equal(outer._viewRegistry, viewRegistry);
 });
 
-QUnit.test('comopnent should rerender when a property (with a default) is changed during children\'s rendering', function() {
+QUnit.test('comopnent should rerender when a property is changed during children\'s rendering', function() {
   expectDeprecation(/modified value twice in a single render/);
 
   var outer, middle;
@@ -843,7 +758,6 @@ QUnit.test('comopnent should rerender when a property (with a default) is change
 
   equal(view.$('#inner-value').text(), '3', 'third render of inner');
   equal(view.$('#middle-value').text(), '3', 'third render of middle');
-
 });
 
 QUnit.test('non-block with each rendering child components', function() {
@@ -871,233 +785,529 @@ QUnit.test('non-block with each rendering child components', function() {
   equal(jQuery('#qunit-fixture').text(), 'In layout. [Child: Tom.][Child: Dick.][Child: Harry.][Child: James.]');
 });
 
+QUnit.test('specifying classNames results in correct class', function(assert) {
+  expect(1);
+
+  registry.register('component:some-clicky-thing', Component.extend({
+    tagName: 'button',
+    classNames: ['foo', 'bar'],
+    click() {
+      assert.ok(true, 'click was fired!');
+    }
+  }));
+
+  view = EmberView.extend({
+    template: compile('{{#some-clicky-thing classNames="baz"}}Click Me{{/some-clicky-thing}}'),
+    container: container
+  }).create();
+
+  runAppend(view);
+
+  let button = view.$('button');
+  ok(button.is('.foo.bar.baz.ember-view'), 'the element has the correct classes: ' + button.attr('class'));
+});
+
+QUnit.test('specifying custom concatenatedProperties avoids clobbering', function(assert) {
+  expect(1);
+
+  let clickyThing;
+  registry.register('component:some-clicky-thing', Component.extend({
+    concatenatedProperties: ['blahzz'],
+    blahzz: ['blark', 'pory'],
+    init() {
+      this._super(...arguments);
+      clickyThing = this;
+    }
+  }));
+
+  view = EmberView.extend({
+    template: compile('{{#some-clicky-thing blahzz="baz"}}Click Me{{/some-clicky-thing}}'),
+    container: container
+  }).create();
+
+  runAppend(view);
+
+  assert.deepEqual(clickyThing.get('blahzz'),  ['blark', 'pory', 'baz'], 'property is properly combined');
+});
+
 // jscs:disable validateIndentation
 if (isEnabled('ember-htmlbars-component-generation')) {
-
   QUnit.module('component - invocation (angle brackets)', {
-  setup() {
-    commonSetup();
-  },
-
-  teardown() {
-    commonTeardown();
-  }
-});
-
-  QUnit.test('non-block without properties', function() {
-  registry.register('template:components/non-block', compile('In layout'));
-
-  view = appendViewFor('<non-block />');
-
-  equal(view.$().text(), 'In layout');
-  ok(view.$('non-block.ember-view').length === 1, 'The non-block tag name was used');
-});
-
-  QUnit.test('block without properties', function() {
-  registry.register('template:components/with-block', compile('In layout - {{yield}}'));
-
-  view = appendViewFor('<with-block>In template</with-block>');
-
-  equal(view.$('with-block.ember-view').text(), 'In layout - In template', 'Both the layout and template are rendered');
-});
-
-  QUnit.test('non-block with properties on attrs', function() {
-  registry.register('template:components/non-block', compile('In layout'));
-
-  view = appendViewFor('<non-block static-prop="static text" concat-prop="{{view.dynamic}} text" dynamic-prop={{view.dynamic}} />', {
-    dynamic: 'dynamic'
-  });
-
-  let el = view.$('non-block.ember-view');
-  ok(el, 'precond - the view was rendered');
-  equal(el.attr('static-prop'), 'static text');
-  equal(el.attr('concat-prop'), 'dynamic text');
-  equal(el.attr('dynamic-prop'), undefined);
-
-  //equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: something here');
-});
-
-  QUnit.test('attributes are not installed on the top level', function() {
-  let component;
-
-  registry.register('template:components/non-block', compile('In layout - {{attrs.text}}'));
-  registry.register('component:non-block', Component.extend({
-    text: null,
-    dynamic: null,
-
-    didInitAttrs() {
-      component = this;
-    }
-  }));
-
-  view = appendViewFor('<non-block text="texting" dynamic={{view.dynamic}} />', {
-    dynamic: 'dynamic'
-  });
-
-  let el = view.$('non-block.ember-view');
-  ok(el, 'precond - the view was rendered');
-
-  equal(el.text(), 'In layout - texting');
-  equal(component.attrs.text, 'texting');
-  equal(component.attrs.dynamic, 'dynamic');
-  strictEqual(get(component, 'text'), null);
-  strictEqual(get(component, 'dynamic'), null);
-
-  run(() => view.rerender());
-
-  equal(el.text(), 'In layout - texting');
-  equal(component.attrs.text, 'texting');
-  equal(component.attrs.dynamic, 'dynamic');
-  strictEqual(get(component, 'text'), null);
-  strictEqual(get(component, 'dynamic'), null);
-});
-
-  QUnit.test('non-block with properties on attrs and component class', function() {
-  registry.register('component:non-block', Component.extend());
-  registry.register('template:components/non-block', compile('In layout - someProp: {{attrs.someProp}}'));
-
-  view = appendViewFor('<non-block someProp="something here" />');
-
-  equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: something here');
-});
-
-  QUnit.test('rerendering component with attrs from parent', function() {
-  var willUpdate = 0;
-  var didReceiveAttrs = 0;
-
-  registry.register('component:non-block', Component.extend({
-    didReceiveAttrs() {
-      didReceiveAttrs++;
+    setup() {
+      commonSetup();
     },
 
-    willUpdate() {
-      willUpdate++;
+    teardown() {
+      commonTeardown();
     }
-  }));
-
-  registry.register('template:components/non-block', compile('In layout - someProp: {{attrs.someProp}}'));
-
-  view = appendViewFor('<non-block someProp={{view.someProp}} />', {
-    someProp: 'wycats'
   });
 
-  equal(didReceiveAttrs, 1, 'The didReceiveAttrs hook fired');
+  QUnit.test('legacy components cannot be invoked with angle brackets', function() {
+    registry.register('template:components/non-block', compile('In layout'));
+    registry.register('component:non-block', Component.extend());
 
-  equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: wycats');
-
-  run(function() {
-    view.set('someProp', 'tomdale');
+    expectAssertion(function() {
+      view = appendViewFor('<non-block />');
+    }, /cannot invoke the 'non-block' component with angle brackets/);
   });
 
-  equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: tomdale');
-  equal(didReceiveAttrs, 2, 'The didReceiveAttrs hook fired again');
-  equal(willUpdate, 1, 'The willUpdate hook fired once');
+  QUnit.test('using a text-fragment in a GlimmerComponent layout gives an error', function() {
+    registry.register('template:components/non-block', compile('In layout'));
 
-  Ember.run(view, 'rerender');
+    expectAssertion(() => {
+      view = appendViewFor('<non-block />');
+    }, `The <non-block> template must have a single top-level element because it is a GlimmerComponent.`);
+  });
 
-  equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: tomdale');
-  equal(didReceiveAttrs, 3, 'The didReceiveAttrs hook fired again');
-  equal(willUpdate, 2, 'The willUpdate hook fired again');
-});
+  QUnit.test('having multiple top-level elements in a GlimmerComponent layout gives an error', function() {
+    registry.register('template:components/non-block', compile('<div>This is a</div><div>fragment</div>'));
+
+    expectAssertion(() => {
+      view = appendViewFor('<non-block />');
+    }, `The <non-block> template must have a single top-level element because it is a GlimmerComponent.`);
+  });
+
+  QUnit.test('using a modifier in a GlimmerComponent layout gives an error', function() {
+    registry.register('template:components/non-block', compile('<div {{action "foo"}}></div>'));
+
+    expectAssertion(() => {
+      view = appendViewFor('<non-block />');
+    }, `You cannot use {{action ...}} in the top-level element of the <non-block> template because it is a GlimmerComponent.`);
+  });
+
+  QUnit.test('using triple-curlies in a GlimmerComponent layout gives an error', function() {
+    registry.register('template:components/non-block', compile('<div style={{{bar}}}>This is a</div>'));
+
+    expectAssertion(() => {
+      view = appendViewFor('<non-block />');
+    }, `You cannot use triple curlies (e.g. style={{{ ... }}}) in the top-level element of the <non-block> template because it is a GlimmerComponent.`);
+  });
+
+  let styles = [{
+    name: 'a div',
+    tagName: 'div'
+  }, {
+    name: 'an identity element',
+    tagName: 'non-block'
+  }, {
+    name: 'a web component',
+    tagName: 'not-an-ember-component'
+  }];
+
+  styles.forEach(style => {
+    QUnit.test(`non-block without attributes replaced with ${style.name}`, function() {
+      // The whitespace is added intentionally to verify that the heuristic is not "a single node" but
+      // rather "a single non-whitespace, non-comment node"
+      registry.register('template:components/non-block', compile(`  <${style.tagName}>In layout</${style.tagName}>  `));
+
+      view = appendViewFor('<non-block />');
+
+      let node = view.element.firstElementChild;
+      equalsElement(node, style.tagName, { class: 'ember-view', id: regex(/^ember\d*$/) }, 'In layout');
+
+      run(view, 'rerender');
+
+      strictEqual(node, view.element.firstElementChild, 'The inner element has not changed');
+      equalsElement(node, style.tagName, { class: 'ember-view', id: regex(/^ember\d*$/) }, 'In layout');
+    });
+
+    QUnit.test(`non-block with attributes replaced with ${style.name}`, function() {
+      registry.register('template:components/non-block', compile(`  <${style.tagName} such="{{attrs.stability}}">In layout</${style.tagName}>  `));
+
+      view = appendViewFor('<non-block stability={{view.stability}} />', {
+        stability: 'stability'
+      });
+
+      let node = view.element.firstElementChild;
+      equalsElement(node, style.tagName, { such: 'stability', class: 'ember-view', id: regex(/^ember\d*$/) }, 'In layout');
+
+      run(() => view.set('stability', 'changed!!!'));
+
+      strictEqual(node, view.element.firstElementChild, 'The inner element has not changed');
+      equalsElement(node, style.tagName, { such: 'changed!!!', class: 'ember-view', id: regex(/^ember\d*$/) }, 'In layout');
+    });
+
+    QUnit.test(`non-block replaced with ${style.name} (regression with single element in the root element)`, function() {
+      registry.register('template:components/non-block', compile(`  <${style.tagName} such="{{attrs.stability}}"><p>In layout</p></${style.tagName}>  `));
+
+      view = appendViewFor('<non-block stability={{view.stability}} />', {
+        stability: 'stability'
+      });
+
+      let node = view.element.firstElementChild;
+      equalsElement(node, style.tagName, { such: 'stability', class: 'ember-view', id: regex(/^ember\d*$/) }, '<p>In layout</p>');
+
+      run(() => view.set('stability', 'changed!!!'));
+
+      strictEqual(node, view.element.firstElementChild, 'The inner element has not changed');
+      equalsElement(node, style.tagName, { such: 'changed!!!', class: 'ember-view', id: regex(/^ember\d*$/) }, '<p>In layout</p>');
+    });
+
+    QUnit.test(`non-block with class replaced with ${style.name} merges classes`, function() {
+      registry.register('template:components/non-block', compile(`<${style.tagName} class="inner-class" />`));
+
+      view = appendViewFor('<non-block class="{{view.outer}}" />', {
+        outer: 'outer'
+      });
+
+      equal(view.$(style.tagName).attr('class'), 'inner-class outer ember-view', 'the classes are merged');
+
+      run(() => view.set('outer', 'new-outer'));
+
+      equal(view.$(style.tagName).attr('class'), 'inner-class new-outer ember-view', 'the classes are merged');
+    });
+
+    QUnit.test(`non-block with outer attributes replaced with ${style.name} shadows inner attributes`, function() {
+      registry.register('template:components/non-block', compile(`<${style.tagName} data-static="static" data-dynamic="{{internal}}" />`));
+
+      view = appendViewFor('<non-block data-static="outer" data-dynamic="outer" />');
+
+      equal(view.$(style.tagName).attr('data-static'), 'outer', 'the outer attribute wins');
+      equal(view.$(style.tagName).attr('data-dynamic'), 'outer', 'the outer attribute wins');
+
+      let component = view.childViews[0]; // HAX
+
+      run(() => component.set('internal', 'changed'));
+
+      equal(view.$(style.tagName).attr('data-static'), 'outer', 'the outer attribute wins');
+      equal(view.$(style.tagName).attr('data-dynamic'), 'outer', 'the outer attribute wins');
+    });
+
+    // TODO: When un-skipping, fix this so it handles all styles
+    QUnit.skip('non-block recursive invocations with outer attributes replaced with a div shadows inner attributes', function() {
+      registry.register('template:components/non-block-wrapper', compile('<non-block />'));
+      registry.register('template:components/non-block', compile('<div data-static="static" data-dynamic="{{internal}}" />'));
+
+      view = appendViewFor('<non-block-wrapper data-static="outer" data-dynamic="outer" />');
+
+      equal(view.$('div').attr('data-static'), 'outer', 'the outer-most attribute wins');
+      equal(view.$('div').attr('data-dynamic'), 'outer', 'the outer-most attribute wins');
+
+      let component = view.childViews[0].childViews[0]; // HAX
+
+      run(() => component.set('internal', 'changed'));
+
+      equal(view.$('div').attr('data-static'), 'outer', 'the outer-most attribute wins');
+      equal(view.$('div').attr('data-dynamic'), 'outer', 'the outer-most attribute wins');
+    });
+
+    QUnit.test(`non-block replaced with ${style.name} should have correct scope`, function() {
+      registry.register('template:components/non-block', compile(`<${style.tagName}>{{internal}}</${style.tagName}>`));
+
+      registry.register('component:non-block', GlimmerComponent.extend({
+        init() {
+          this._super(...arguments);
+          this.set('internal', 'stuff');
+        }
+      }));
+
+      view = appendViewFor('<non-block />');
+
+      equal(view.$().text(), 'stuff');
+    });
+
+    QUnit.test(`non-block replaced with ${style.name} should have correct 'element'`, function() {
+      registry.register('template:components/non-block', compile(`<${style.tagName} />`));
+
+      let component;
+
+      registry.register('component:non-block', GlimmerComponent.extend({
+        init() {
+          this._super(...arguments);
+          component = this;
+        }
+      }));
+
+      view = appendViewFor('<non-block />');
+
+      equal(component.element, view.$(style.tagName)[0]);
+    });
+
+    QUnit.test(`non-block replaced with ${style.name} should have inner attributes`, function() {
+      registry.register('template:components/non-block', compile(`<${style.tagName} data-static="static" data-dynamic="{{internal}}" />`));
+
+      registry.register('component:non-block', GlimmerComponent.extend({
+        init() {
+          this._super(...arguments);
+          this.set('internal', 'stuff');
+        }
+      }));
+
+      view = appendViewFor('<non-block />');
+
+      equal(view.$(style.tagName).attr('data-static'), 'static');
+      equal(view.$(style.tagName).attr('data-dynamic'), 'stuff');
+    });
+
+    QUnit.test(`only text attributes are reflected on the underlying DOM element (${style.name})`, function() {
+      registry.register('template:components/non-block', compile(`<${style.tagName}>In layout</${style.tagName}>`));
+
+      view = appendViewFor('<non-block static-prop="static text" concat-prop="{{view.dynamic}} text" dynamic-prop={{view.dynamic}} />', {
+        dynamic: 'dynamic'
+      });
+
+      let el = view.$(style.tagName);
+      equal(el.length, 1, 'precond - the view was rendered');
+      equal(el.text(), 'In layout');
+      equal(el.attr('static-prop'), 'static text');
+      equal(el.attr('concat-prop'), 'dynamic text');
+      equal(el.attr('dynamic-prop'), undefined);
+    });
+
+    QUnit.skip(`partials templates should not be treated like a component layout for ${style.name}`, function() {
+      registry.register('template:_zomg', compile(`<p>In partial</p>`));
+      registry.register('template:components/non-block', compile(`<${style.tagName}>{{partial "zomg"}}</${style.tagName}>`));
+
+      view = appendViewFor('<non-block />');
+
+      let el = view.$(style.tagName).find('p');
+      equal(el.length, 1, 'precond - the partial was rendered');
+      equal(el.text(), 'In partial');
+      strictEqual(el.attr('id'), undefined, 'the partial should not get an id');
+      strictEqual(el.attr('class'), undefined, 'the partial should not get a class');
+    });
+  });
+
+  QUnit.skip('[FRAGMENT] non-block rendering a fragment', function() {
+    registry.register('template:components/non-block', compile('<p>{{attrs.first}}</p><p>{{attrs.second}}</p>'));
+
+    view = appendViewFor('<non-block first={{view.first}} second={{view.second}} />', {
+      first: 'first1',
+      second: 'second1'
+    });
+
+    equal(view.$().html(), '<p>first1</p><p>second1</p>', 'No wrapping element was created');
+
+    run(view, 'setProperties', {
+      first: 'first2',
+      second: 'second2'
+    });
+
+    equal(view.$().html(), '<p>first2</p><p>second2</p>', 'The fragment was updated');
+  });
+
+  QUnit.test('block without properties', function() {
+    registry.register('template:components/with-block', compile('<with-block>In layout - {{yield}}</with-block>'));
+
+    view = appendViewFor('<with-block>In template</with-block>');
+
+    equal(view.$('with-block.ember-view').text(), 'In layout - In template', 'Both the layout and template are rendered');
+  });
+
+  QUnit.test('attributes are not installed on the top level', function() {
+    let component;
+
+    registry.register('template:components/non-block', compile('<non-block>In layout - {{attrs.text}} -- {{text}}</non-block>'));
+    registry.register('component:non-block', GlimmerComponent.extend({
+      // This is specifically attempting to trigger a 1.x-era heuristic that only copied
+      // attrs that were present as defined properties on the component.
+      text: null,
+      dynamic: null,
+
+      init() {
+        this._super(...arguments);
+        component = this;
+      }
+    }));
+
+    view = appendViewFor('<non-block text="texting" dynamic={{view.dynamic}} />', {
+      dynamic: 'dynamic'
+    });
+
+    let el = view.$('non-block.ember-view');
+    ok(el, 'precond - the view was rendered');
+
+    equal(el.text(), 'In layout - texting -- ');
+    equal(component.attrs.text, 'texting');
+    equal(component.attrs.dynamic, 'dynamic');
+    strictEqual(get(component, 'text'), null);
+    strictEqual(get(component, 'dynamic'), null);
+
+    run(() => view.rerender());
+
+    equal(el.text(), 'In layout - texting -- ');
+    equal(component.attrs.text, 'texting');
+    equal(component.attrs.dynamic, 'dynamic');
+    strictEqual(get(component, 'text'), null);
+    strictEqual(get(component, 'dynamic'), null);
+  });
+
+  QUnit.test('non-block with properties on attrs and component class', function() {
+    registry.register('component:non-block', GlimmerComponent.extend());
+    registry.register('template:components/non-block', compile('<non-block>In layout - someProp: {{attrs.someProp}}</non-block>'));
+
+    view = appendViewFor('<non-block someProp="something here" />');
+
+    equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: something here');
+  });
+
+  QUnit.test('rerendering component with attrs from parent', function() {
+    var willUpdate = 0;
+    var didReceiveAttrs = 0;
+
+    registry.register('component:non-block', GlimmerComponent.extend({
+      didReceiveAttrs() {
+        didReceiveAttrs++;
+      },
+
+      willUpdate() {
+        willUpdate++;
+      }
+    }));
+
+    registry.register('template:components/non-block', compile('<non-block>In layout - someProp: {{attrs.someProp}}</non-block>'));
+
+    view = appendViewFor('<non-block someProp={{view.someProp}} />', {
+      someProp: 'wycats'
+    });
+
+    equal(didReceiveAttrs, 1, 'The didReceiveAttrs hook fired');
+
+    equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: wycats');
+
+    run(function() {
+      view.set('someProp', 'tomdale');
+    });
+
+    equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: tomdale');
+    equal(didReceiveAttrs, 2, 'The didReceiveAttrs hook fired again');
+    equal(willUpdate, 1, 'The willUpdate hook fired once');
+
+    Ember.run(view, 'rerender');
+
+    equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: tomdale');
+    equal(didReceiveAttrs, 3, 'The didReceiveAttrs hook fired again');
+    equal(willUpdate, 2, 'The willUpdate hook fired again');
+  });
 
   QUnit.test('block with properties on attrs', function() {
-  registry.register('template:components/with-block', compile('In layout - someProp: {{attrs.someProp}} - {{yield}}'));
+    registry.register('template:components/with-block', compile('<with-block>In layout - someProp: {{attrs.someProp}} - {{yield}}</with-block>'));
 
-  view = appendViewFor('<with-block someProp="something here">In template</with-block>');
+    view = appendViewFor('<with-block someProp="something here">In template</with-block>');
 
-  equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: something here - In template');
-});
+    equal(jQuery('#qunit-fixture').text(), 'In layout - someProp: something here - In template');
+  });
 
   QUnit.test('moduleName is available on _renderNode when a layout is present', function() {
-  expect(1);
+    expect(1);
 
-  var layoutModuleName = 'my-app-name/templates/components/sample-component';
-  var sampleComponentLayout = compile('Sample Component - {{yield}}', {
-    moduleName: layoutModuleName
+    var layoutModuleName = 'my-app-name/templates/components/sample-component';
+    var sampleComponentLayout = compile('<sample-component>Sample Component - {{yield}}</sample-component>', {
+      moduleName: layoutModuleName
+    });
+    registry.register('template:components/sample-component', sampleComponentLayout);
+    registry.register('component:sample-component', GlimmerComponent.extend({
+      didInsertElement: function() {
+        equal(this._renderNode.lastResult.template.meta.moduleName, layoutModuleName);
+      }
+    }));
+
+    view = EmberView.extend({
+      layout: compile('<sample-component />'),
+      container
+    }).create();
+
+    runAppend(view);
   });
-  registry.register('template:components/sample-component', sampleComponentLayout);
-  registry.register('component:sample-component', Component.extend({
-    didInsertElement: function() {
-      equal(this._renderNode.lastResult.template.meta.moduleName, layoutModuleName);
-    }
-  }));
-
-  view = EmberView.extend({
-    layout: compile('<sample-component />'),
-    container
-  }).create();
-
-  runAppend(view);
-});
 
   QUnit.test('moduleName is available on _renderNode when no layout is present', function() {
-  expect(1);
+    expect(1);
 
-  var templateModuleName = 'my-app-name/templates/application';
-  registry.register('component:sample-component', Component.extend({
-    didInsertElement: function() {
-      equal(this._renderNode.lastResult.template.meta.moduleName, templateModuleName);
-    }
-  }));
+    var templateModuleName = 'my-app-name/templates/application';
+    registry.register('component:sample-component', Component.extend({
+      didInsertElement: function() {
+        equal(this._renderNode.lastResult.template.meta.moduleName, templateModuleName);
+      }
+    }));
 
-  view = EmberView.extend({
-    layout: compile('{{#sample-component}}Derp{{/sample-component}}', {
-      moduleName: templateModuleName
-    }),
-    container
-  }).create();
+    view = EmberView.extend({
+      layout: compile('{{#sample-component}}Derp{{/sample-component}}', {
+        moduleName: templateModuleName
+      }),
+      container
+    }).create();
 
-  runAppend(view);
-});
+    runAppend(view);
+  });
+
+  QUnit.test('computed property alias on attrs', function() {
+    registry.register('template:components/computed-alias', compile('<computed-alias>{{otherProp}}</computed-alias>'));
+
+    registry.register('component:computed-alias', GlimmerComponent.extend({
+      otherProp: Ember.computed.alias('attrs.someProp')
+    }));
+
+    view = appendViewFor('<computed-alias someProp="value"></computed-alias>');
+
+    equal(view.$().text(), 'value');
+  });
 
   QUnit.test('parameterized hasBlock default', function() {
-  registry.register('template:components/check-block', compile('{{#if (hasBlock)}}Yes{{else}}No{{/if}}'));
+    registry.register('template:components/check-block', compile('<check-block>{{#if (hasBlock)}}Yes{{else}}No{{/if}}</check-block>'));
 
-  view = appendViewFor('<check-block id="expect-yes-1" />  <check-block id="expect-yes-2"></check-block>');
+    view = appendViewFor('<check-block id="expect-yes-1" />  <check-block id="expect-yes-2"></check-block>');
 
-  equal(view.$('#expect-yes-1').text(), 'Yes');
-  equal(view.$('#expect-yes-2').text(), 'Yes');
-});
+    equal(view.$('#expect-yes-1').text(), 'Yes');
+    equal(view.$('#expect-yes-2').text(), 'Yes');
+  });
 
   QUnit.test('non-expression hasBlock ', function() {
-  registry.register('template:components/check-block', compile('{{#if hasBlock}}Yes{{else}}No{{/if}}'));
+    registry.register('template:components/check-block', compile('<check-block>{{#if hasBlock}}Yes{{else}}No{{/if}}</check-block>'));
 
-  view = appendViewFor('<check-block id="expect-yes-1" />  <check-block id="expect-yes-2"></check-block>');
+    view = appendViewFor('<check-block id="expect-yes-1" />  <check-block id="expect-yes-2"></check-block>');
 
-  equal(view.$('#expect-yes-1').text(), 'Yes');
-  equal(view.$('#expect-yes-2').text(), 'Yes');
-});
+    equal(view.$('#expect-yes-1').text(), 'Yes');
+    equal(view.$('#expect-yes-2').text(), 'Yes');
+  });
 
   QUnit.test('parameterized hasBlockParams', function() {
-  registry.register('template:components/check-params', compile('{{#if (hasBlockParams)}}Yes{{else}}No{{/if}}'));
+    registry.register('template:components/check-params', compile('<check-params>{{#if (hasBlockParams)}}Yes{{else}}No{{/if}}</check-params>'));
 
-  view = appendViewFor('<check-params id="expect-no"/>  <check-params id="expect-yes" as |foo|></check-params>');
+    view = appendViewFor('<check-params id="expect-no"/>  <check-params id="expect-yes" as |foo|></check-params>');
 
-  equal(view.$('#expect-no').text(), 'No');
-  equal(view.$('#expect-yes').text(), 'Yes');
-});
+    equal(view.$('#expect-no').text(), 'No');
+    equal(view.$('#expect-yes').text(), 'Yes');
+  });
 
   QUnit.test('non-expression hasBlockParams', function() {
-  registry.register('template:components/check-params', compile('{{#if hasBlockParams}}Yes{{else}}No{{/if}}'));
+    registry.register('template:components/check-params', compile('<check-params>{{#if hasBlockParams}}Yes{{else}}No{{/if}}</check-params>'));
 
-  view = appendViewFor('<check-params id="expect-no" />  <check-params id="expect-yes" as |foo|></check-params>');
+    view = appendViewFor('<check-params id="expect-no" />  <check-params id="expect-yes" as |foo|></check-params>');
 
-  equal(view.$('#expect-no').text(), 'No');
-  equal(view.$('#expect-yes').text(), 'Yes');
-});
-
-  QUnit.test('implementing `render` allows pushing into a string buffer', function() {
-  expect(1);
-
-  registry.register('component:non-block', Component.extend({
-    render(buffer) {
-      buffer.push('<span id="zomg">Whoop!</span>');
-    }
-  }));
-
-  expectAssertion(function() {
-    appendViewFor('<non-block />');
+    equal(view.$('#expect-no').text(), 'No');
+    equal(view.$('#expect-yes').text(), 'Yes');
   });
-});
-
 }
+
+function regex(r) {
+  return {
+    match(v) {
+      return r.test(v);
+    }
+  };
+}
+
+function equalsElement(element, tagName, attributes, content) {
+  QUnit.push(element.tagName === tagName.toUpperCase(), element.tagName.toLowerCase(), tagName, `expect tagName to be ${tagName}`);
+
+  let expectedCount = 0;
+  for (let prop in attributes) {
+    expectedCount++;
+    let expected = attributes[prop];
+    if (typeof expected === 'string') {
+      QUnit.push(element.getAttribute(prop) === attributes[prop], element.getAttribute(prop), attributes[prop], `The element should have ${prop}=${attributes[prop]}`);
+    } else {
+      QUnit.push(attributes[prop].match(element.getAttribute(prop)), element.getAttribute(prop), attributes[prop], `The element should have ${prop}=${attributes[prop]}`);
+    }
+  }
+
+  let actualAttributes = {};
+  for (let i = 0, l = element.attributes.length; i < l; i++) {
+    actualAttributes[element.attributes[i].name] = element.attributes[i].value;
+  }
+
+  QUnit.push(element.attributes.length === expectedCount, actualAttributes, attributes, `Expected ${expectedCount} attributes`);
+
+  QUnit.push(element.innerHTML === content, element.innerHTML, content, `The element had '${content}' as its content`);
+}
+

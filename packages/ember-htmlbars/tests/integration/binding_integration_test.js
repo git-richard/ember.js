@@ -12,12 +12,16 @@ import { registerHelper } from 'ember-htmlbars/helpers';
 
 import { set } from 'ember-metal/property_set';
 
-var view, MyApp, originalLookup, lookup;
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
+var view, MyApp, originalLookup, lookup, originalViewKeyword;
 
 var trim = jQuery.trim;
 
 QUnit.module('ember-htmlbars: binding integration', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     originalLookup = Ember.lookup;
     Ember.lookup = lookup = {};
 
@@ -28,6 +32,7 @@ QUnit.module('ember-htmlbars: binding integration', {
     Ember.lookup = originalLookup;
 
     runDestroy(view);
+    resetKeyword('view', originalViewKeyword);
     view = null;
 
     MyApp = null;
@@ -166,20 +171,14 @@ QUnit.test('should update bound values after view\'s parent is removed and then 
 });
 
 QUnit.test('should accept bindings as a string or an Ember.Binding', function() {
-  var ViewWithBindings;
-
-  expectDeprecation(function() {
-    ViewWithBindings = EmberView.extend({
-      oneWayBindingTestBinding: Binding.oneWay('context.direction'),
-      twoWayBindingTestBinding: Binding.from('context.direction'),
-      stringBindingTestBinding: 'context.direction',
-      template: compile(
-        'one way: {{view.oneWayBindingTest}}, ' +
-        'two way: {{view.twoWayBindingTest}}, ' +
-        'string: {{view.stringBindingTest}}'
-      )
-    });
-  }, 'Ember.oneWay has been deprecated. Please use Ember.computed.oneWay instead.');
+  var ViewWithBindings = EmberView.extend({
+    twoWayBindingTestBinding: Binding.from('context.direction'),
+    stringBindingTestBinding: 'context.direction',
+    template: compile(
+      'two way: {{view.twoWayBindingTest}}, ' +
+      'string: {{view.stringBindingTest}}'
+    )
+  });
 
   view = EmberView.create({
     viewWithBindingsClass: ViewWithBindings,
@@ -191,5 +190,5 @@ QUnit.test('should accept bindings as a string or an Ember.Binding', function() 
 
   runAppend(view);
 
-  equal(trim(view.$().text()), 'one way: down, two way: down, string: down');
+  equal(trim(view.$().text()), 'two way: down, string: down');
 });

@@ -34,7 +34,7 @@ suite.test('every should stop invoking when you return true', function() {
     found.push(i);
     return --cnt >= 0;
   });
-  equal(result, ary[exp-1], 'return value of obj.find');
+  equal(result, ary[exp - 1], 'return value of obj.find');
   equal(found.length, exp, 'should invoke proper number of times');
   deepEqual(found, ary.slice(0, -2), 'items passed during find() should match');
 });
@@ -100,14 +100,6 @@ suite.test('should return first undefined property match', function() {
 
   equal(obj.findBy('foo', undefined), ary[0], 'findBy(\'foo\', undefined)');
   equal(obj.findBy('bar', undefined), ary[1], 'findBy(\'bar\', undefined)');
-});
-
-suite.test('should be aliased to findProperty', function() {
-  var obj;
-
-  obj = this.newObject([]);
-
-  equal(obj.findProperty, obj.findBy);
 });
 
 export default suite;

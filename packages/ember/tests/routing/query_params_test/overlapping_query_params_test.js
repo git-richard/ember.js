@@ -1,10 +1,7 @@
 import 'ember';
 import Ember from 'ember-metal/core';
 import isEnabled from 'ember-metal/features';
-
-import EmberHandlebars from 'ember-htmlbars/compat';
-
-var compile = EmberHandlebars.compile;
+import { compile } from 'ember-template-compiler';
 
 var Router, App, router, registry, container;
 
@@ -57,7 +54,7 @@ function sharedSetup() {
 
     App.deferReadiness();
 
-    registry = App.registry;
+    registry = App.__registry__;
     container = App.__container__;
 
     registry.register('location:test', TestLocation);
@@ -171,7 +168,7 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
       }
     });
 
-    App.ParentChildRoute= Ember.Route.extend({
+    App.ParentChildRoute = Ember.Route.extend({
       queryParams: {
         bar: {
           as: 'shared',
@@ -268,7 +265,6 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
   });
 
   QUnit.test('Support shared but overridable mixin pattern', function() {
-
     var HasPage = Ember.Mixin.create({
       queryParams: 'page',
       page: 1

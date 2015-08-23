@@ -1,6 +1,7 @@
 import Ember from 'ember-metal/core';
 import Registry from 'container/registry';
 import { factory } from 'container/tests/container_helper';
+import isEnabled from 'ember-metal/features';
 
 var originalModelInjections;
 
@@ -359,7 +360,7 @@ QUnit.test('The container normalizes names when looking factory up', function() 
   equal(fact.toString() === PostController.extend().toString(), true, 'Normalizes the name when looking factory up');
 });
 
-QUnit.test('The container can get options that should be applied to a given factory', function() {
+QUnit.test('Options can be registered that should be applied to a given factory', function() {
   var registry = new Registry();
   var container = registry.container();
   var PostView = factory();
@@ -381,7 +382,7 @@ QUnit.test('The container can get options that should be applied to a given fact
   ok(postView1 !== postView2, 'The two lookups are different');
 });
 
-QUnit.test('The container can get options that should be applied to all factories for a given type', function() {
+QUnit.test('Options can be registered that should be applied to all factories for a given type', function() {
   var registry = new Registry();
   var container = registry.container();
   var PostView = factory();
@@ -403,7 +404,23 @@ QUnit.test('The container can get options that should be applied to all factorie
   ok(postView1 !== postView2, 'The two lookups are different');
 });
 
-QUnit.test('factory resolves are cached', function() {
+QUnit.test('An injected non-singleton instance is never cached', function() {
+  var registry = new Registry();
+  var container = registry.container();
+  var PostView = factory();
+  var PostViewHelper = factory();
+
+  registry.register('view:post', PostView, { singleton: false });
+  registry.register('view_helper:post', PostViewHelper, { singleton: false });
+  registry.injection('view:post', 'viewHelper', 'view_helper:post');
+
+  var postView1 = container.lookup('view:post');
+  var postView2 = container.lookup('view:post');
+
+  ok(postView1.viewHelper !== postView2.viewHelper, 'Injected non-singletons are not cached');
+});
+
+QUnit.test('Factory resolves are cached', function() {
   var registry = new Registry();
   var container = registry.container();
   var PostController = factory();
@@ -519,3 +536,13 @@ QUnit.test('Lazy injection validations are cached', function() {
   container.lookup('apple:main');
   container.lookup('apple:main');
 });
+
+if (!isEnabled('ember-registry-container-reform')) {
+  QUnit.test('Container#_registry provides an alias to Container#registry while Container is pseudo-public', function() {
+    var registry = new Registry();
+    var container = registry.container();
+
+    strictEqual(container.registry, registry, '#registry points to the parent registry');
+    strictEqual(container._registry, registry, '#_registry is an alias to #registry');
+  });
+}

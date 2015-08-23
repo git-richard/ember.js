@@ -4,7 +4,6 @@ import { testBoth } from 'ember-metal/tests/props_helper';
 QUnit.module('Function.prototype.observes() helper');
 
 testBoth('global observer helper takes multiple params', function(get, set) {
-
   if (Ember.EXTEND_PROTOTYPES === false) {
     ok('undefined' === typeof Function.prototype.observes, 'Function.prototype helper disabled');
     return;
@@ -15,7 +14,7 @@ testBoth('global observer helper takes multiple params', function(get, set) {
     count: 0,
 
     foo: function() {
-      set(this, 'count', get(this, 'count')+1);
+      set(this, 'count', get(this, 'count') + 1);
     }.observes('bar', 'baz')
 
   });
@@ -31,7 +30,6 @@ testBoth('global observer helper takes multiple params', function(get, set) {
 QUnit.module('Function.prototype.on() helper');
 
 testBoth('sets up an event listener, and can trigger the function on multiple events', function(get, set) {
-
   if (Ember.EXTEND_PROTOTYPES === false) {
     ok('undefined' === typeof Function.prototype.on, 'Function.prototype helper disabled');
     return;
@@ -42,7 +40,7 @@ testBoth('sets up an event listener, and can trigger the function on multiple ev
     count: 0,
 
     foo: function() {
-      set(this, 'count', get(this, 'count')+1);
+      set(this, 'count', get(this, 'count') + 1);
     }.on('bar', 'baz')
 
   });
@@ -56,7 +54,6 @@ testBoth('sets up an event listener, and can trigger the function on multiple ev
 });
 
 testBoth('can be chained with observes', function(get, set) {
-
   if (Ember.EXTEND_PROTOTYPES === false) {
     ok('Function.prototype helper disabled');
     return;
@@ -67,7 +64,7 @@ testBoth('can be chained with observes', function(get, set) {
     count: 0,
     bay: 'bay',
     foo: function() {
-      set(this, 'count', get(this, 'count')+1);
+      set(this, 'count', get(this, 'count') + 1);
     }.observes('bay').on('bar')
   });
 
@@ -82,7 +79,6 @@ testBoth('can be chained with observes', function(get, set) {
 QUnit.module('Function.prototype.property() helper');
 
 testBoth('sets up a ComputedProperty', function(get, set) {
-
   if (Ember.EXTEND_PROTOTYPES === false) {
     ok('undefined' === typeof Function.prototype.property, 'Function.prototype helper disabled');
     return;

@@ -2,7 +2,7 @@ import Ember from 'ember-metal/core';
 import {get} from 'ember-metal/property_get';
 import {set} from 'ember-metal/property_set';
 import run from 'ember-metal/run_loop';
-import {Binding, bind, oneWay} from 'ember-metal/binding';
+import {Binding, bind } from 'ember-metal/binding';
 import {observer as emberObserver} from 'ember-metal/mixin';
 import EmberObject from 'ember-runtime/system/object';
 
@@ -79,7 +79,6 @@ QUnit.test('toObject change should propagate to fromObject only after flush', fu
 });
 
 QUnit.test('deferred observing during bindings', function() {
-
   // setup special binding
   fromObject = EmberObject.create({
     value1: 'value1',
@@ -119,41 +118,6 @@ QUnit.test('binding disconnection actually works', function() {
     set(fromObject, 'value', 'change');
   });
   equal(get(toObject, 'value'), 'start');
-});
-
-// ..........................................................
-// one way binding
-//
-
-QUnit.module('one way binding', {
-
-  setup() {
-    run(function() {
-      fromObject = EmberObject.create({ value: 'start' });
-      toObject = EmberObject.create({ value: 'end' });
-      root = { fromObject: fromObject, toObject: toObject };
-      binding = oneWay(root, 'toObject.value', 'fromObject.value');
-    });
-  },
-  teardown() {
-    run.cancelTimers();
-  }
-});
-
-QUnit.test('fromObject change should propagate after flush', function() {
-  run(function() {
-    set(fromObject, 'value', 'change');
-    equal(get(toObject, 'value'), 'start');
-  });
-  equal(get(toObject, 'value'), 'change');
-});
-
-QUnit.test('toObject change should NOT propagate', function() {
-  run(function() {
-    set(toObject, 'value', 'change');
-    equal(get(fromObject, 'value'), 'start');
-  });
-  equal(get(fromObject, 'value'), 'start');
 });
 
 var first, second, third, binding1, binding2; // global variables
@@ -220,7 +184,7 @@ QUnit.module('Custom Binding', {
     bon2 = EmberObject.create({
       val1: 'hello',
       val2: 25,
-      arr: [1,2,3,4]
+      arr: [1, 2, 3, 4]
     });
 
     Ember.lookup['TestNamespace'] = TestNamespace = {
@@ -236,7 +200,6 @@ QUnit.module('Custom Binding', {
 });
 
 QUnit.test('two bindings to the same value should sync in the order they are initialized', function() {
-
   run.begin();
 
   var a = EmberObject.create({

@@ -8,12 +8,11 @@ import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
 import isNone from 'ember-metal/is_none';
 import run from 'ember-metal/run_loop';
-import { fmt } from 'ember-runtime/system/string';
 import EmberObject from 'ember-runtime/system/object';
 import jQuery from 'ember-views/system/jquery';
 import ActionManager from 'ember-views/system/action_manager';
 import View from 'ember-views/views/view';
-import merge from 'ember-metal/merge';
+import assign from 'ember-metal/assign';
 
 /**
   `Ember.EventDispatcher` handles delegating browser events to their
@@ -30,12 +29,29 @@ export default EmberObject.extend({
 
   /**
     The set of events names (and associated handler function names) to be setup
-    and dispatched by the `EventDispatcher`. Custom events can added to this list at setup
-    time, generally via the `Ember.Application.customEvents` hash. Only override this
-    default set to prevent the EventDispatcher from listening on some events all together.
+    and dispatched by the `EventDispatcher`. Modifications to this list can be done
+    at setup time, generally via the `Ember.Application.customEvents` hash.
 
-    This set will be modified by `setup` to also include any events added at that time.
+    To add new events to be listened to:
 
+    ```javascript
+    var App = Ember.Application.create({
+      customEvents: {
+        paste: 'paste'
+      }
+    });
+    ```
+
+    To prevent default events from being listened to:
+
+    ```javascript
+    var App = Ember.Application.create({
+      customEvents: {
+        mouseenter: null,
+        mouseleave: null
+      }
+    });
+    ```
     @property events
     @type Object
     @private
@@ -130,9 +146,7 @@ export default EmberObject.extend({
   */
   setup(addedEvents, rootElement) {
     var event;
-    var events = get(this, 'events');
-
-    merge(events, addedEvents || {});
+    var events = assign({}, get(this, 'events'), addedEvents);
 
     if (!isNone(rootElement)) {
       set(this, 'rootElement', rootElement);
@@ -140,7 +154,7 @@ export default EmberObject.extend({
 
     rootElement = jQuery(get(this, 'rootElement'));
 
-    Ember.assert(fmt('You cannot use the same root element (%@) multiple times in an Ember.Application', [rootElement.selector || rootElement[0].tagName]), !rootElement.is('.ember-application'));
+    Ember.assert(`You cannot use the same root element (${rootElement.selector || rootElement[0].tagName}) multiple times in an Ember.Application`, !rootElement.is('.ember-application'));
     Ember.assert('You cannot make a new Ember.Application using a root element that is a descendent of an existing Ember.Application', !rootElement.closest('.ember-application').length);
     Ember.assert('You cannot make a new Ember.Application using a root element that is an ancestor of an existing Ember.Application', !rootElement.find('.ember-application').length);
 
@@ -172,6 +186,10 @@ export default EmberObject.extend({
   setupHandler(rootElement, event, eventName) {
     var self = this;
     var viewRegistry = this.container && this.container.lookup('-view-registry:main') || View.views;
+
+    if (eventName === null) {
+      return;
+    }
 
     rootElement.on(event + '.ember', '.ember-view', function(evt, triggeringManager) {
       var view = viewRegistry[this.id];

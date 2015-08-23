@@ -3,13 +3,21 @@ import run from 'ember-metal/run_loop';
 import EmberView from 'ember-views/views/view';
 import ContainerView from 'ember-views/views/container_view';
 
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
+var originalViewKeyword;
 var view;
 
 QUnit.module('EmberView#destroyElement', {
+  setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
+  },
   teardown() {
     run(function() {
       view.destroy();
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -88,5 +96,5 @@ QUnit.test('removes element from parentNode if in DOM', function() {
   });
 
   equal(view.$(), undefined, 'view has no selector');
-  ok(!parent.find('#'+view.get('elementId')).length, 'element no longer in parent node');
+  ok(!parent.find('#' + view.get('elementId')).length, 'element no longer in parent node');
 });

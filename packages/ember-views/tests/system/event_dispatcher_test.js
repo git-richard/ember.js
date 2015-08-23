@@ -9,11 +9,15 @@ import EventDispatcher from 'ember-views/system/event_dispatcher';
 import ContainerView from 'ember-views/views/container_view';
 import compile from 'ember-template-compiler/system/compile';
 
-var view;
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
+var view, originalViewKeyword;
 var dispatcher;
 
 QUnit.module('EventDispatcher', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     run(function() {
       dispatcher = EventDispatcher.create();
       dispatcher.setup();
@@ -25,6 +29,7 @@ QUnit.module('EventDispatcher', {
       if (view) { view.destroy(); }
       dispatcher.destroy();
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -171,7 +176,7 @@ QUnit.test('events should stop propagating if the view is destroyed', function()
 });
 
 QUnit.test('should dispatch events to nearest event manager', function() {
-  var receivedEvent=0;
+  var receivedEvent = 0;
   view = View.create({
     template: compile('<input id="is-done" type="checkbox">'),
 
@@ -195,7 +200,7 @@ QUnit.test('should dispatch events to nearest event manager', function() {
 QUnit.test('event manager should be able to re-dispatch events to view', function() {
   expectDeprecation('Setting `childViews` on a Container is deprecated.');
 
-  var receivedEvent=0;
+  var receivedEvent = 0;
   view = ContainerView.extend({
 
     eventManager: EmberObject.extend({
@@ -306,4 +311,35 @@ QUnit.test('additional events and rootElement can be specified', function () {
   equal(dispatcher.get('rootElement'), '.custom-root', 'the rootElement is updated');
 
   jQuery('#leView').trigger('myevent');
+});
+
+QUnit.test('default events can be disabled via `customEvents`', function () {
+  expect(1);
+
+  run(function () {
+    dispatcher.setup({
+      click: null
+    });
+
+    view = View.create({
+      elementId: 'leView',
+
+      null() {
+        // yes, at one point `click: null` made an event handler
+        // for `click` that called `null` on the view
+        ok(false, 'null event has been triggered');
+      },
+
+      click() {
+        ok(false, 'click event has been triggered');
+      },
+
+      doubleClick() {
+        ok(true, 'good event was still triggered');
+      }
+    }).appendTo(dispatcher.get('rootElement'));
+  });
+
+  jQuery('#leView').trigger('click');
+  jQuery('#leView').trigger('dblclick');
 });

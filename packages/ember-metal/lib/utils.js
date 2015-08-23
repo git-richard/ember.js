@@ -3,9 +3,6 @@
 //
 'REMOVE_USE_STRICT: true';
 
-import Ember from 'ember-metal/core';
-import isEnabled from 'ember-metal/features';
-
 /**
 @module ember-metal
 */
@@ -22,8 +19,7 @@ var _uuid = 0;
 /**
   Generates a universally unique identifier. This method
   is used internally by Ember for assisting with
-  the generation of GUID's and other unique identifiers
-  such as `bind-attr` data attributes.
+  the generation of GUID's and other unique identifiers.
 
   @public
   @return {Number} [description]
@@ -127,13 +123,6 @@ export var GUID_DESC = {
   value: null
 };
 
-var undefinedDescriptor = {
-  configurable: true,
-  writable: true,
-  enumerable: false,
-  value: undefined
-};
-
 var nullDescriptor = {
   configurable: true,
   writable: true,
@@ -141,28 +130,10 @@ var nullDescriptor = {
   value: null
 };
 
-var META_DESC = {
-  writable: true,
-  configurable: true,
-  enumerable: false,
-  value: null
-};
-
-export var EMBER_META_PROPERTY = {
-  name: '__ember_meta__',
-  descriptor: META_DESC
-};
-
 export var GUID_KEY_PROPERTY = {
   name: GUID_KEY,
   descriptor: nullDescriptor
 };
-
-export var NEXT_SUPER_PROPERTY = {
-  name: '__nextSuper',
-  descriptor: undefinedDescriptor
-};
-
 
 /**
   Generates a new guid, optionally saving the guid to the object that you
@@ -217,6 +188,9 @@ export function generateGuid(obj, prefix) {
   @return {String} the unique guid for this instance.
 */
 export function guidFor(obj) {
+  if (obj && obj[GUID_KEY]) {
+    return obj[GUID_KEY];
+  }
 
   // special cases where we don't want to add a key to object
   if (obj === undefined) {
@@ -236,7 +210,7 @@ export function guidFor(obj) {
       ret = numberCache[obj];
 
       if (!ret) {
-        ret = numberCache[obj] = 'nu'+obj;
+        ret = numberCache[obj] = 'nu' + obj;
       }
 
       return ret;
@@ -254,10 +228,6 @@ export function guidFor(obj) {
       return obj ? '(true)' : '(false)';
 
     default:
-      if (obj[GUID_KEY]) {
-        return obj[GUID_KEY];
-      }
-
       if (obj === Object) {
         return '(Object)';
       }
@@ -283,160 +253,31 @@ export function guidFor(obj) {
   }
 }
 
-// ..........................................................
-// META
-//
-function Meta(obj) {
-  this.watching = {};
-  this.cache = undefined;
-  this.cacheMeta = undefined;
-  this.source = obj;
-  this.deps = undefined;
-  this.listeners = undefined;
-  this.mixins = undefined;
-  this.bindings = undefined;
-  this.chains = undefined;
-  this.values = undefined;
-  this.proto = undefined;
-}
 
-Meta.prototype = {
-  chainWatchers: null // FIXME
-};
+const checkHasSuper = (function () {
+  let sourceAvailable = (function() {
+    return this;
+  }).toString().indexOf('return this;') > -1;
 
-// Placeholder for non-writable metas.
-var EMPTY_META = new Meta(null);
-
-if (isEnabled('mandatory-setter')) {
-  EMPTY_META.values = {};
-}
-
-/**
-  Retrieves the meta hash for an object. If `writable` is true ensures the
-  hash is writable for this object as well.
-
-  The meta object contains information about computed property descriptors as
-  well as any watched properties and other information. You generally will
-  not access this information directly but instead work with higher level
-  methods that manipulate this hash indirectly.
-
-  @method meta
-  @for Ember
-  @private
-
-  @param {Object} obj The object to retrieve meta for
-  @param {Boolean} [writable=true] Pass `false` if you do not intend to modify
-    the meta hash, allowing the method to avoid making an unnecessary copy.
-  @return {Object} the meta hash for an object
-*/
-function meta(obj, writable) {
-  var ret = obj.__ember_meta__;
-  if (writable===false) {
-    return ret || EMPTY_META;
+  if (sourceAvailable) {
+    return function checkHasSuper(func) {
+      return func.toString().indexOf('_super') > -1;
+    };
   }
 
-  if (!ret) {
-    if (obj.__defineNonEnumerable) {
-      obj.__defineNonEnumerable(EMBER_META_PROPERTY);
-    } else {
-      Object.defineProperty(obj, '__ember_meta__', META_DESC);
-    }
+  return function checkHasSuper() {
+    return true;
+  };
+}());
 
-    ret = new Meta(obj);
+function ROOT() {}
+ROOT.__hasSuper = false;
 
-    if (isEnabled('mandatory-setter')) {
-      ret.values = {};
-    }
-
-    obj.__ember_meta__ = ret;
-  } else if (ret.source !== obj) {
-    if (obj.__defineNonEnumerable) {
-      obj.__defineNonEnumerable(EMBER_META_PROPERTY);
-    } else {
-      Object.defineProperty(obj, '__ember_meta__', META_DESC);
-    }
-
-    ret = Object.create(ret);
-    ret.watching  = Object.create(ret.watching);
-    ret.cache     = undefined;
-    ret.cacheMeta = undefined;
-    ret.source    = obj;
-
-    if (isEnabled('mandatory-setter')) {
-      ret.values = Object.create(ret.values);
-    }
-
-    obj['__ember_meta__'] = ret;
+function hasSuper(func) {
+  if (func.__hasSuper === undefined) {
+    func.__hasSuper = checkHasSuper(func);
   }
-  return ret;
-}
-
-export function getMeta(obj, property) {
-  var _meta = meta(obj, false);
-  return _meta[property];
-}
-
-export function setMeta(obj, property, value) {
-  var _meta = meta(obj, true);
-  _meta[property] = value;
-  return value;
-}
-
-/**
-  @deprecated
-  @private
-
-  In order to store defaults for a class, a prototype may need to create
-  a default meta object, which will be inherited by any objects instantiated
-  from the class's constructor.
-
-  However, the properties of that meta object are only shallow-cloned,
-  so if a property is a hash (like the event system's `listeners` hash),
-  it will by default be shared across all instances of that class.
-
-  This method allows extensions to deeply clone a series of nested hashes or
-  other complex objects. For instance, the event system might pass
-  `['listeners', 'foo:change', 'ember157']` to `prepareMetaPath`, which will
-  walk down the keys provided.
-
-  For each key, if the key does not exist, it is created. If it already
-  exists and it was inherited from its constructor, the constructor's
-  key is cloned.
-
-  You can also pass false for `writable`, which will simply return
-  undefined if `prepareMetaPath` discovers any part of the path that
-  shared or undefined.
-
-  @method metaPath
-  @for Ember
-  @param {Object} obj The object whose meta we are examining
-  @param {Array} path An array of keys to walk down
-  @param {Boolean} writable whether or not to create a new meta
-    (or meta property) if one does not already exist or if it's
-    shared with its constructor
-*/
-export function metaPath(obj, path, writable) {
-  Ember.deprecate('Ember.metaPath is deprecated and will be removed from future releases.');
-  var _meta = meta(obj, writable);
-  var keyName, value;
-
-  for (var i=0, l=path.length; i<l; i++) {
-    keyName = path[i];
-    value = _meta[keyName];
-
-    if (!value) {
-      if (!writable) { return undefined; }
-      value = _meta[keyName] = { __ember_source__: obj };
-    } else if (value.__ember_source__ !== obj) {
-      if (!writable) { return undefined; }
-      value = _meta[keyName] = Object.create(value);
-      value.__ember_source__ = obj;
-    }
-
-    _meta = value;
-  }
-
-  return value;
+  return func.__hasSuper;
 }
 
 /**
@@ -451,41 +292,46 @@ export function metaPath(obj, path, writable) {
   @param {Function} superFunc The super function.
   @return {Function} wrapped function.
 */
-
 export function wrap(func, superFunc) {
+  if (!hasSuper(func)) {
+    return func;
+  }
+  // ensure an unwrapped super that calls _super is wrapped with a terminal _super
+  if (!superFunc.wrappedFunction && hasSuper(superFunc)) {
+    return _wrap(func, _wrap(superFunc, ROOT));
+  }
+  return _wrap(func, superFunc);
+}
+
+function _wrap(func, superFunc) {
   function superWrapper() {
-    var ret;
-    var sup  = this && this.__nextSuper;
-    var length = arguments.length;
-
-    if (this) {
-      this.__nextSuper = superFunc;
+    let orig = this._super;
+    let length = arguments.length;
+    let ret;
+    this._super = superFunc;
+    switch (length) {
+      case 0:  ret = func.call(this); break;
+      case 1:  ret = func.call(this, arguments[0]); break;
+      case 2:  ret = func.call(this, arguments[0], arguments[1]); break;
+      case 3:  ret = func.call(this, arguments[0], arguments[1], arguments[2]); break;
+      case 4:  ret = func.call(this, arguments[0], arguments[1], arguments[2], arguments[3]); break;
+      case 5:  ret = func.call(this, arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]); break;
+      default:
+        // v8 bug potentially incorrectly deopts this function: https://code.google.com/p/v8/issues/detail?id=3709
+        // we may want to keep this around till this ages out on mobile
+        let args = new Array(length);
+        for (var x = 0; x < length; x++) {
+          args[x] = arguments[x];
+        }
+        ret = func.apply(this, args);
+        break;
     }
-
-    if (length === 0) {
-      ret = func.call(this);
-    } else if (length === 1) {
-      ret = func.call(this, arguments[0]);
-    } else if (length === 2) {
-      ret = func.call(this, arguments[0], arguments[1]);
-    } else {
-      var args = new Array(length);
-      for (var i = 0; i < length; i++) {
-        args[i] = arguments[i];
-      }
-      ret = apply(this, func, args);
-    }
-
-    if (this) {
-      this.__nextSuper = sup;
-    }
-
+    this._super = orig;
     return ret;
   }
 
   superWrapper.wrappedFunction = func;
   superWrapper.__ember_observes__ = func.__ember_observes__;
-  superWrapper.__ember_observesBefore__ = func.__ember_observesBefore__;
   superWrapper.__ember_listens__ = func.__ember_listens__;
 
   return superWrapper;
@@ -600,7 +446,7 @@ export function inspect(obj) {
   // for non objects
   var type = typeof obj;
   if (type !== 'object' && type !== 'symbol') {
-    return ''+obj;
+    return '' + obj;
   }
   // overridden toString
   if (typeof obj.toString === 'function' && obj.toString !== toString) {
@@ -668,9 +514,6 @@ export function applyStr(t, m, a) {
 
 export {
   GUID_KEY,
-  META_DESC,
-  EMPTY_META,
-  meta,
   makeArray,
   canInvoke
 };

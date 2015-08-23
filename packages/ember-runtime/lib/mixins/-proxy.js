@@ -6,12 +6,12 @@
 import Ember from 'ember-metal/core'; // Ember.assert
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
-import { meta } from 'ember-metal/utils';
+import { meta } from 'ember-metal/meta';
 import {
   addObserver,
   removeObserver,
-  addBeforeObserver,
-  removeBeforeObserver
+  _addBeforeObserver,
+  _removeBeforeObserver
 } from 'ember-metal/observer';
 import {
   propertyWillChange,
@@ -20,7 +20,6 @@ import {
 import { computed } from 'ember-metal/computed';
 import { defineProperty } from 'ember-metal/properties';
 import { Mixin, observer } from 'ember-metal/mixin';
-import { fmt } from 'ember-runtime/system/string';
 
 function contentPropertyWillChange(content, contentKey) {
   var key = contentKey.slice(8); // remove "content."
@@ -62,23 +61,22 @@ export default Mixin.create({
 
   willWatchProperty(key) {
     var contentKey = 'content.' + key;
-    addBeforeObserver(this, contentKey, null, contentPropertyWillChange);
+    _addBeforeObserver(this, contentKey, null, contentPropertyWillChange);
     addObserver(this, contentKey, null, contentPropertyDidChange);
   },
 
   didUnwatchProperty(key) {
     var contentKey = 'content.' + key;
-    removeBeforeObserver(this, contentKey, null, contentPropertyWillChange);
+    _removeBeforeObserver(this, contentKey, null, contentPropertyWillChange);
     removeObserver(this, contentKey, null, contentPropertyDidChange);
   },
 
   unknownProperty(key) {
     var content = get(this, 'content');
     if (content) {
-      Ember.deprecate(
-        fmt('You attempted to access `%@` from `%@`, but object proxying is deprecated. ' +
-            'Please use `model.%@` instead.', [key, this, key]),
-        !this.isController
+      Ember.deprecate(`You attempted to access \`${key}\` from \`${this}\`, but object proxying is deprecated. Please use \`model.${key}\` instead.`,
+        !this.isController,
+        { id: 'ember-runtime.controller-proxy', until: '3.0.0' }
       );
       return get(content, key);
     }
@@ -94,13 +92,11 @@ export default Mixin.create({
     }
 
     var content = get(this, 'content');
-    Ember.assert(fmt('Cannot delegate set(\'%@\', %@) to the \'content\' property of' +
-                     ' object proxy %@: its \'content\' is undefined.', [key, value, this]), content);
+    Ember.assert(`Cannot delegate set('${key}', ${value}) to the \'content\' property of object proxy ${this}: its 'content' is undefined.`, content);
 
-    Ember.deprecate(
-      fmt('You attempted to set `%@` from `%@`, but object proxying is deprecated. ' +
-          'Please use `model.%@` instead.', [key, this, key]),
-      !this.isController
+    Ember.deprecate(`You attempted to set \`${key}\` from \`${this}\`, but object proxying is deprecated. Please use \`model.${key}\` instead.`,
+      !this.isController,
+      { id: 'ember-runtime.controller-proxy', until: '3.0.0' }
     );
     return set(content, key, value);
   }

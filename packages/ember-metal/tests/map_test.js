@@ -116,25 +116,7 @@ function testMap(nameAndFunc) {
   });
 
   QUnit.test('forEach throws without a callback as the first argument', function() {
-
     equal(map.forEach.length, 1, 'expected arity for map.forEach is 1');
-  });
-
-  QUnit.test('remove', function() {
-    map.set(object, 'winning');
-    map.set(number, 'winning');
-    map.set(string, 'winning');
-
-    expectDeprecation(function() {
-      map.remove(object);
-      map.remove(number);
-      map.remove(string);
-
-      // doesn't explode
-      map.remove({});
-    }, 'Calling `Map.prototype.remove` has been deprecated, please use `Map.prototype.delete` instead.');
-
-    mapHasEntries([]);
   });
 
   QUnit.test('has empty collection', function() {
@@ -201,41 +183,6 @@ function testMap(nameAndFunc) {
     ]);
 
     mapHasEntries([], map2);
-  });
-
-  QUnit.test('length', function() {
-    expectDeprecation('Usage of `length` is deprecated, use `size` instead.');
-
-    //Add a key twice
-    equal(map.length, 0);
-    map.set(string, 'a string');
-    equal(map.length, 1);
-    map.set(string, 'the same string');
-    equal(map.length, 1);
-
-    //Add another
-    map.set(number, 'a number');
-    equal(map.length, 2);
-
-    //Remove one that doesn't exist
-    map.delete('does not exist');
-    equal(map.length, 2);
-
-    //Check copy
-    var copy = map.copy();
-    equal(copy.length, 2);
-
-    //Remove a key twice
-    map.delete(number);
-    equal(map.length, 1);
-    map.delete(number);
-    equal(map.length, 1);
-
-    //Remove the last key
-    map.delete(string);
-    equal(map.length, 0);
-    map.delete(string);
-    equal(map.length, 0);
   });
 
   QUnit.test('size', function() {
@@ -323,7 +270,6 @@ function testMap(nameAndFunc) {
     });
 
     equal(iteration, 3, 'expected 3 iterations');
-
   });
 
   QUnit.test('forEach basic /w context', function() {
@@ -348,7 +294,6 @@ function testMap(nameAndFunc) {
       equal(map, theMap, 'map being iterated over should be passed in');
 
       iteration++;
-
     }, context);
 
     equal(iteration, 3, 'expected 3 iterations');
@@ -453,7 +398,7 @@ function testMap(nameAndFunc) {
     equal(map.get(-0), 'zero');
 
     map.forEach(function(value, key) {
-      equal(1/key, Infinity, 'spec says key should be positive zero');
+      equal(1 / key, Infinity, 'spec says key should be positive zero');
     });
   });
 
@@ -465,7 +410,6 @@ function testMap(nameAndFunc) {
     equal(map.has(NaN), true);
 
     equal(map.get(NaN), 'not-a-number');
-
   });
 
   QUnit.test('NaN Boxed', function() {

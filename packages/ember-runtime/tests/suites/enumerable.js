@@ -3,7 +3,7 @@ import EmberObject from 'ember-runtime/system/object';
 import {guidFor, generateGuid} from 'ember-metal/utils';
 import {computed} from 'ember-metal/computed';
 import {get} from 'ember-metal/property_get';
-import { addBeforeObserver } from 'ember-metal/observer';
+import { _addBeforeObserver } from 'ember-metal/observer';
 
 var ObserverClass = EmberObject.extend({
 
@@ -55,7 +55,7 @@ var ObserverClass = EmberObject.extend({
     var keys = Array.prototype.slice.call(arguments, 1);
     var loc  = keys.length;
     while (--loc>=0) {
-      addBeforeObserver(obj, keys[loc], this, 'propertyWillChange');
+      _addBeforeObserver(obj, keys[loc], this, 'propertyWillChange');
     }
 
     return this;
@@ -105,7 +105,7 @@ var ObserverClass = EmberObject.extend({
       return false;
     }
 
-    if (arguments.length>1) {
+    if (arguments.length > 1) {
       return this._values[key] === value;
     } else {
       return true;
@@ -266,11 +266,11 @@ var EnumerableTests = Suite.extend({
   */
   newObserver(obj) {
     var ret = get(this, 'observerClass').create();
-    if (arguments.length>0) {
+    if (arguments.length > 0) {
       ret.observeBefore.apply(ret, arguments);
     }
 
-    if (arguments.length>0) {
+    if (arguments.length > 0) {
       ret.observe.apply(ret, arguments);
     }
 

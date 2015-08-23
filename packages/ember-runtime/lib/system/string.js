@@ -60,7 +60,7 @@ var DECAMELIZE_CACHE = new Cache(1000, function(str) {
   return str.replace(STRING_DECAMELIZE_REGEXP, '$1_$2').toLowerCase();
 });
 
-function fmt(str, formats) {
+function _fmt(str, formats) {
   var cachedFormats = formats;
 
   if (!isArray(cachedFormats) || arguments.length > 2) {
@@ -80,13 +80,22 @@ function fmt(str, formats) {
   });
 }
 
+function fmt(str, formats) {
+  Ember.deprecate(
+    'Ember.String.fmt is deprecated, use ES6 template strings instead.',
+    false,
+    { id: 'ember-string-utils.fmt', until: '3.0.0', url: 'https://babeljs.io/docs/learn-es6/#template-strings' }
+  );
+  return _fmt(...arguments);
+}
+
 function loc(str, formats) {
   if (!isArray(formats) || arguments.length > 2) {
     formats = Array.prototype.slice.call(arguments, 1);
   }
 
   str = Ember.STRINGS[str] || str;
-  return fmt(str, formats);
+  return _fmt(str, formats);
 }
 
 function w(str) {
@@ -160,8 +169,9 @@ export default {
     @param {Array} formats An array of parameters to interpolate into string.
     @return {String} formatted string
     @public
+    @deprecated Use ES6 template strings instead: https://babeljs.io/docs/learn-es6/#template-strings');
   */
-  fmt: fmt,
+  fmt,
 
   /**
     Formats the passed string, but first looks up the string in the localized
@@ -188,7 +198,7 @@ export default {
     @return {String} formatted string
     @public
   */
-  loc: loc,
+  loc,
 
   /**
     Splits a string into separate units separated by spaces, eliminating any
@@ -210,7 +220,7 @@ export default {
     @return {Array} array containing the split strings
     @public
   */
-  w: w,
+  w,
 
   /**
     Converts a camelized string into all lower case separated by underscores.
@@ -227,7 +237,7 @@ export default {
     @return {String} the decamelized string.
     @public
   */
-  decamelize: decamelize,
+  decamelize,
 
   /**
     Replaces underscores, spaces, or camelCase with dashes.
@@ -245,7 +255,7 @@ export default {
     @return {String} the dasherized string.
     @public
   */
-  dasherize: dasherize,
+  dasherize,
 
   /**
     Returns the lowerCamelCase form of a string.
@@ -264,7 +274,7 @@ export default {
     @return {String} the camelized string.
     @public
   */
-  camelize: camelize,
+  camelize,
 
   /**
     Returns the UpperCamelCase form of a string.
@@ -282,7 +292,7 @@ export default {
     @return {String} the classified string
     @public
   */
-  classify: classify,
+  classify,
 
   /**
     More general than decamelize. Returns the lower\_case\_and\_underscored
@@ -301,7 +311,7 @@ export default {
     @return {String} the underscored string.
     @public
   */
-  underscore: underscore,
+  underscore,
 
   /**
     Returns the Capitalized form of a string
@@ -319,7 +329,7 @@ export default {
     @return {String} The capitalized string.
     @public
   */
-  capitalize: capitalize
+  capitalize
 };
 
 export {

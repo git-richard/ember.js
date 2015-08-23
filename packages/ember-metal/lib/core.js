@@ -153,7 +153,6 @@ Ember.LOG_VERSION = (Ember.ENV.LOG_VERSION === false) ? false : true;
   An empty function useful for some operations. Always returns `this`.
 
   @method K
-  @private
   @return {Object}
   @public
 */
@@ -162,15 +161,21 @@ export { K };
 Ember.K = K;
 //TODO: ES6 GLOBAL TODO
 
-// Stub out the methods defined by the ember-debug package in case it's not loaded
 
-if ('undefined' === typeof Ember.assert) { Ember.assert = K; }
-if ('undefined' === typeof Ember.warn) { Ember.warn = K; }
-if ('undefined' === typeof Ember.debug) { Ember.debug = K; }
-if ('undefined' === typeof Ember.runInDebug) { Ember.runInDebug = K; }
-if ('undefined' === typeof Ember.deprecate) { Ember.deprecate = K; }
-if ('undefined' === typeof Ember.deprecateFunc) {
-  Ember.deprecateFunc = function(_, func) { return func; };
-}
+import {
+  assert,
+  warn,
+  debug,
+  deprecate,
+  deprecateFunc,
+  runInDebug
+} from 'ember-metal/assert';
+
+Ember.assert = assert;
+Ember.warn = warn;
+Ember.debug = debug;
+Ember.deprecate = deprecate;
+Ember.deprecateFunc = deprecateFunc;
+Ember.runInDebug = runInDebug;
 
 export default Ember;

@@ -1,15 +1,15 @@
 import Ember from 'ember-metal/core';
-import { assign } from 'ember-metal/merge';
+import assign from 'ember-metal/assign';
 import buildComponentTemplate from 'ember-views/system/build-component-template';
-import lookupComponent from 'ember-htmlbars/utils/lookup-component';
 import getCellOrValue from 'ember-htmlbars/hooks/get-cell-or-value';
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
 import setProperties from 'ember-metal/set_properties';
 import { MUTABLE_CELL } from 'ember-views/compat/attrs-proxy';
-import SafeString from 'htmlbars-util/safe-string';
+import { HAS_BLOCK } from 'ember-views/system/link-to';
 import { instrument } from 'ember-htmlbars/system/instrumentation-support';
-import EmberComponent from 'ember-views/views/component';
+import LegacyEmberComponent from 'ember-views/components/component';
+import GlimmerComponent from 'ember-htmlbars/glimmer-component';
 import Stream from 'ember-metal/streams/stream';
 import { readArray } from 'ember-metal/streams/utils';
 
@@ -38,21 +38,18 @@ ComponentNodeManager.create = function(renderNode, env, options) {
         parentView,
         parentScope,
         isAngleBracket,
+        component,
+        layout,
         templates } = options;
 
   attrs = attrs || {};
 
-  // Try to find the Component class and/or template for this component name in
-  // the container.
-  let { component, layout } = lookupComponent(env.container, tagName);
+  component = component || (isAngleBracket ? GlimmerComponent : LegacyEmberComponent);
 
-  Ember.assert('HTMLBars error: Could not find component named "' + tagName + '" (no component or template with that name was found)', function() {
-    return component || layout;
-  });
-
-  component = component || EmberComponent;
-
-  let createOptions = { parentView };
+  let createOptions = {
+    parentView,
+    [HAS_BLOCK]: !!templates.default
+  };
 
   configureTagName(attrs, tagName, component, isAngleBracket, createOptions);
 
@@ -67,27 +64,45 @@ ComponentNodeManager.create = function(renderNode, env, options) {
     createOptions._controller = getValue(parentScope.locals.controller);
   }
 
-  // this flag is set when a block was provided so that components can see if
-  // `this.get('template')` is truthy.  this is added for backwards compat only
-  // and accessing `template` prop on a component will trigger a deprecation
-  // 2.0TODO: remove
-  if (templates.default) {
-    createOptions._deprecatedFlagForBlockProvided = true;
-  }
+  extractPositionalParams(renderNode, component, params, attrs);
 
   // Instantiate the component
   component = createComponent(component, isAngleBracket, createOptions, renderNode, env, attrs);
 
-  // If the component specifies its template via the `layout` or `template`
-  // properties instead of using the template looked up in the container, get
-  // them now that we have the component instance.
-  let result = extractComponentTemplates(component, templates);
-  layout = result.layout || layout;
-  templates = result.templates || templates;
+  // If the component specifies its layout via the `layout` property
+  // instead of using the template looked up in the container, get it
+  // now that we have the component instance.
+  layout = get(component, 'layout') || layout;
 
-  extractPositionalParams(renderNode, component, params, attrs);
+  Ember.runInDebug(() => {
+    var assert = Ember.assert;
 
-  var results = buildComponentTemplate(
+    if (isAngleBracket) {
+      assert(`You cannot invoke the '${tagName}' component with angle brackets, because it's a subclass of Component. Please upgrade to GlimmerComponent. Alternatively, you can invoke as '{{${tagName}}}'.`, component.isGlimmerComponent);
+    } else {
+      assert(`You cannot invoke the '${tagName}' component with curly braces, because it's a subclass of GlimmerComponent. Please invoke it as '<${tagName}>' instead.`, !component.isGlimmerComponent);
+    }
+
+    if (!layout) { return; }
+
+    let fragmentReason = layout.meta.fragmentReason;
+    if (isAngleBracket && fragmentReason) {
+      switch (fragmentReason.name) {
+        case 'missing-wrapper':
+          assert(`The <${tagName}> template must have a single top-level element because it is a GlimmerComponent.`);
+          break;
+        case 'modifiers':
+          let modifiers = fragmentReason.modifiers.map(m => `{{${m} ...}}`);
+          assert(`You cannot use ${ modifiers.join(', ') } in the top-level element of the <${tagName}> template because it is a GlimmerComponent.`);
+          break;
+        case 'triple-curlies':
+          assert(`You cannot use triple curlies (e.g. style={{{ ... }}}) in the top-level element of the <${tagName}> template because it is a GlimmerComponent.`);
+          break;
+      }
+    }
+  });
+
+  let results = buildComponentTemplate(
     { layout, component, isAngleBracket }, attrs, { templates, scope: parentScope }
   );
 
@@ -95,78 +110,40 @@ ComponentNodeManager.create = function(renderNode, env, options) {
 };
 
 function extractPositionalParams(renderNode, component, params, attrs) {
-  if (component.positionalParams) {
-    // if the component is rendered via {{component}} helper, the first
-    // element of `params` is the name of the component, so we need to
-    // skip that when the positional parameters are constructed
-    const paramsStartIndex = renderNode.state.isComponentHelper ? 1 : 0;
-    const positionalParams = component.positionalParams;
-    const isNamed = typeof positionalParams === 'string';
-    let paramsStream;
+  let positionalParams = component.positionalParams;
 
-    if (isNamed) {
-      paramsStream = new Stream(() => {
-        return readArray(params.slice(paramsStartIndex));
-      }, 'params');
+  if (positionalParams) {
+    processPositionalParams(renderNode, positionalParams, params, attrs);
+  }
+}
 
-      attrs[positionalParams] = paramsStream;
+function processPositionalParams(renderNode, positionalParams, params, attrs) {
+  // if the component is rendered via {{component}} helper, the first
+  // element of `params` is the name of the component, so we need to
+  // skip that when the positional parameters are constructed
+  const paramsStartIndex = renderNode.state.isComponentHelper ? 1 : 0;
+  const isNamed = typeof positionalParams === 'string';
+  let paramsStream;
+
+  if (isNamed) {
+    paramsStream = new Stream(() => {
+      return readArray(params.slice(paramsStartIndex));
+    }, 'params');
+
+    attrs[positionalParams] = paramsStream;
+  }
+
+  if (isNamed) {
+    for (let i = paramsStartIndex; i < params.length; i++) {
+      let param = params[i];
+      paramsStream.addDependency(param);
     }
-
-    for (let i=0; i < positionalParams.length; i++) {
+  } else {
+    for (let i = 0; i < positionalParams.length; i++) {
       let param = params[paramsStartIndex + i];
-      if (isNamed) {
-        paramsStream.addDependency(param);
-      } else {
-        attrs[positionalParams[i]] = param;
-      }
+      attrs[positionalParams[i]] = param;
     }
   }
-}
-
-function extractComponentTemplates(component, _templates) {
-  // Even though we looked up a layout from the container earlier, the
-  // component may specify a `layout` property that overrides that.
-  // The component may also provide a `template` property we should
-  // respect (though this behavior is deprecated).
-  let componentLayout = get(component, 'layout');
-  let hasBlock = _templates && _templates.default;
-  let layout, templates, componentTemplate;
-  if (hasBlock) {
-    componentTemplate = null;
-  } else if (component.isComponent) {
-    componentTemplate = get(component, '_template');
-  } else {
-    componentTemplate = get(component, 'template');
-  }
-
-  if (componentLayout) {
-    layout = componentLayout;
-    templates = extractLegacyTemplate(_templates, componentTemplate);
-  } else if (componentTemplate) {
-    // If the component has a `template` but no `layout`, use the template
-    // as the layout.
-    layout = componentTemplate;
-    templates = _templates;
-    Ember.deprecate('Using deprecated `template` property on a Component.');
-  }
-
-  return { layout, templates };
-}
-
-// 2.0TODO: Remove legacy behavior
-function extractLegacyTemplate(_templates, componentTemplate) {
-  let templates;
-
-  // There is no block template provided but the component has a
-  // `template` property.
-  if ((!_templates || !_templates.default) && componentTemplate) {
-    Ember.deprecate('Using deprecated `template` property on a Component.');
-    templates = { default: componentTemplate.raw };
-  } else {
-    templates = _templates;
-  }
-
-  return templates;
 }
 
 function configureTagName(attrs, tagName, component, isAngleBracket, createOptions) {
@@ -187,13 +164,11 @@ function configureCreateOptions(attrs, createOptions) {
 }
 
 ComponentNodeManager.prototype.render = function(_env, visitor) {
-  var { component, attrs } = this;
+  var { component } = this;
 
   return instrument(component, function() {
     let env = _env.childWithView(component);
 
-    var snapshot = takeSnapshot(attrs);
-    env.renderer.componentInitAttrs(this.component, snapshot);
     env.renderer.componentWillRender(component);
     env.renderedViews.push(component.elementId);
 
@@ -201,33 +176,40 @@ ComponentNodeManager.prototype.render = function(_env, visitor) {
       this.block(env, [], undefined, this.renderNode, this.scope, visitor);
     }
 
-    var element = this.expectElement && this.renderNode.firstNode;
+    let element;
+    if (this.expectElement || component.isGlimmerComponent) {
+      // This code assumes that Glimmer components are never fragments. When
+      // Glimmer components gain fragment powers, we will need to communicate
+      // whether the layout produced a single top-level node or fragment
+      // somehow (either via static information on the template/component, or
+      // dynamically as the layout is being rendered).
+      element = this.renderNode.firstNode;
 
-    handleLegacyRender(component, element);
-    env.renderer.didCreateElement(component, element);
-    env.renderer.willInsertElement(component, element); // 2.0TODO remove legacy hook
+      // Glimmer components may have whitespace or boundary nodes around the
+      // top-level element.
+      if (element && element.nodeType !== 1) {
+        element = nextElementSibling(element);
+      }
+    }
 
-    env.lifecycleHooks.push({ type: 'didInsertElement', view: component });
+    // In environments like FastBoot, disable any hooks that would cause the component
+    // to access the DOM directly.
+    if (env.destinedForDOM) {
+      env.renderer.didCreateElement(component, element);
+      env.renderer.willInsertElement(component, element);
+
+      env.lifecycleHooks.push({ type: 'didInsertElement', view: component });
+    }
   }, this);
 };
 
-export function handleLegacyRender(component, element) {
-  if (!component.render) { return; }
+function nextElementSibling(node) {
+  let current = node;
 
-  Ember.assert('Legacy render functions are not supported with angle-bracket components', !component._isAngleBracket);
-
-  var content, node, lastChildIndex;
-  var buffer = [];
-  var renderNode = component._renderNode;
-  component.render(buffer);
-  content = buffer.join('');
-  if (element) {
-    lastChildIndex = renderNode.childNodes.length - 1;
-    node = renderNode.childNodes[lastChildIndex];
-  } else {
-    node = renderNode;
+  while (current) {
+    if (current.nodeType === 1) { return current; }
+    current = node.nextSibling;
   }
-  node.setContent(new SafeString(content));
 }
 
 ComponentNodeManager.prototype.rerender = function(_env, attrs, visitor) {
@@ -277,14 +259,14 @@ ComponentNodeManager.prototype.destroy = function() {
 export function createComponent(_component, isAngleBracket, _props, renderNode, env, attrs = {}) {
   let props = assign({}, _props);
 
+  let snapshot = takeSnapshot(attrs);
+  props.attrs = snapshot;
+
   if (!isAngleBracket) {
-    let hasSuppliedController = 'controller' in attrs; // 2.0TODO remove
-    Ember.deprecate('controller= is deprecated', !hasSuppliedController);
-
-    let snapshot = takeSnapshot(attrs);
-    props.attrs = snapshot;
-
     let proto = _component.proto();
+
+    Ember.assert('controller= is no longer supported', !('controller' in attrs));
+
     mergeBindings(props, shadowedAttrs(proto, snapshot));
   } else {
     props._isAngleBracket = true;
@@ -308,6 +290,7 @@ export function createComponent(_component, isAngleBracket, _props, renderNode, 
 
   component._renderNode = renderNode;
   renderNode.emberView = component;
+  renderNode.buildChildEnv = buildChildEnv;
   return component;
 }
 
@@ -346,7 +329,7 @@ function mergeBindings(target, attrs) {
     // set `"blah"` to the root of the target because
     // that would replace all attrs with `attrs.attrs`
     if (prop === 'attrs') {
-      Ember.warn(`Invoking a component with a hash attribute named \`attrs\` is not supported. Please refactor usage of ${target} to avoid passing \`attrs\` as a hash parameter.`);
+      Ember.warn(`Invoking a component with a hash attribute named \`attrs\` is not supported. Please refactor usage of ${target} to avoid passing \`attrs\` as a hash parameter.`, false, { id: 'ember-htmlbars.component-unsupported-attrs' });
       continue;
     }
     let value = attrs[prop];
@@ -359,4 +342,8 @@ function mergeBindings(target, attrs) {
   }
 
   return target;
+}
+
+function buildChildEnv(state, env) {
+  return env.childWithView(this.emberView);
 }

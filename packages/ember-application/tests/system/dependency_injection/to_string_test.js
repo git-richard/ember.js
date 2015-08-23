@@ -22,7 +22,6 @@ QUnit.module('Ember.Application Dependency Injection – toString', {
     });
 
     App.Post = EmberObject.extend();
-
   },
 
   teardown() {
@@ -57,7 +56,7 @@ QUnit.test('with a custom resolver', function() {
     });
   });
 
-  App.registry.register('model:peter', EmberObject.extend());
+  App.register('model:peter', EmberObject.extend());
 
   var peter = App.__container__.lookup('model:peter');
   var guid = guidFor(peter);

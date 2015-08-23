@@ -8,7 +8,7 @@ function TransformComponentAttrsIntoMut() {
   @method transform
   @param {AST} ast The AST to be transformed.
 */
-TransformComponentAttrsIntoMut.prototype.transform = function TransformBindAttrToAttributes_transform(ast) {
+TransformComponentAttrsIntoMut.prototype.transform = function TransformComponentAttrsIntoMut_transform(ast) {
   var b = this.syntax.builders;
   var walker = new this.syntax.Walker();
 
@@ -32,7 +32,7 @@ function validate(node) {
 }
 
 function each(list, callback) {
-  for (var i=0, l=list.length; i<l; i++) {
+  for (var i = 0, l = list.length; i < l; i++) {
     callback(list[i]);
   }
 }

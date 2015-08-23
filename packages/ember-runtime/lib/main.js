@@ -5,15 +5,13 @@
 
 // BEGIN IMPORTS
 import Ember from 'ember-metal';
-import { isEqual } from 'ember-runtime/core';
+import isEqual from 'ember-runtime/is-equal';
 import compare from 'ember-runtime/compare';
 import copy from 'ember-runtime/copy';
 import inject from 'ember-runtime/inject';
 
 import Namespace from 'ember-runtime/system/namespace';
 import EmberObject from 'ember-runtime/system/object';
-import TrackedArray from 'ember-runtime/system/tracked_array';
-import SubArray from 'ember-runtime/system/subarray';
 import { Container, Registry } from 'ember-runtime/system/container';
 import ArrayProxy from 'ember-runtime/system/array_proxy';
 import ObjectProxy from 'ember-runtime/system/object_proxy';
@@ -43,7 +41,6 @@ import MutableArray from 'ember-runtime/mixins/mutable_array';
 import TargetActionSupport from 'ember-runtime/mixins/target_action_support';
 import Evented from 'ember-runtime/mixins/evented';
 import PromiseProxyMixin from 'ember-runtime/mixins/promise_proxy';
-import SortableMixin from 'ember-runtime/mixins/sortable';
 
 import {
   sum,
@@ -60,8 +57,6 @@ import {
   intersect
 } from 'ember-runtime/computed/reduce_computed_macros';
 
-import ArrayController from 'ember-runtime/controllers/array_controller';
-import ObjectController from 'ember-runtime/controllers/object_controller';
 import Controller from 'ember-runtime/controllers/controller';
 import ControllerMixin from 'ember-runtime/mixins/controller';
 
@@ -71,7 +66,7 @@ import RSVP from 'ember-runtime/ext/rsvp';     // just for side effect of extend
 import 'ember-runtime/ext/string';   // just for side effect of extending String.prototype
 import 'ember-runtime/ext/function'; // just for side effect of extending Function.prototype
 
-import { typeOf } from 'ember-runtime/utils';
+import { isArray, typeOf } from 'ember-runtime/utils';
 // END IMPORTS
 
 // BEGIN EXPORTS
@@ -85,8 +80,6 @@ Ember.Array = EmberArray;
 
 Ember.Comparable = Comparable;
 Ember.Copyable = Copyable;
-
-Ember.SortableMixin = SortableMixin;
 
 Ember.Freezable = Freezable;
 Ember.FROZEN_ERROR = FROZEN_ERROR;
@@ -102,7 +95,7 @@ Ember.PromiseProxyMixin = PromiseProxyMixin;
 Ember.Observable = Observable;
 
 Ember.typeOf = typeOf;
-Ember.isArray = Array.isArray;
+Ember.isArray = isArray;
 
 // ES6TODO: this seems a less than ideal way/place to add properties to Ember.computed
 var EmComputed = Ember.computed;
@@ -122,8 +115,6 @@ EmComputed.intersect = intersect;
 
 Ember.String = EmberStringUtils;
 Ember.Object = EmberObject;
-Ember.TrackedArray = TrackedArray;
-Ember.SubArray = SubArray;
 Ember.Container = Container;
 Ember.Registry = Registry;
 Ember.Namespace = Namespace;
@@ -138,8 +129,6 @@ Ember.NativeArray = NativeArray;
 Ember.onLoad = onLoad;
 Ember.runLoadHooks = runLoadHooks;
 
-Ember.ArrayController = ArrayController;
-Ember.ObjectController = ObjectController;
 Ember.Controller = Controller;
 Ember.ControllerMixin = ControllerMixin;
 

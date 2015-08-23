@@ -1,11 +1,17 @@
 import { get } from 'ember-metal/property_get';
 import run from 'ember-metal/run_loop';
 import EmberView from 'ember-views/views/view';
+import { on } from 'ember-metal/events';
+import { observer } from 'ember-metal/mixin';
 
-var view, myViewClass, newView, container;
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
+var view, myViewClass, newView, container, originalViewKeyword;
 
 QUnit.module('EmberView#createChildView', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     container = { };
 
     view = EmberView.create({
@@ -20,6 +26,7 @@ QUnit.module('EmberView#createChildView', {
       view.destroy();
       if (newView) { newView.destroy(); }
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -33,7 +40,28 @@ QUnit.test('should create view from class with any passed attributes', function(
   equal(newView.container, container, 'expects to share container with parent');
   ok(get(newView, 'isMyView'), 'newView is instance of myView');
   equal(get(newView, 'foo'), 'baz', 'view did get custom attributes');
-  ok(!attrs.parentView, 'the original attributes hash was not mutated');
+});
+
+QUnit.test('creating a childView, (via createChildView) should make parentView initial state and not emit change events nore helper actions', function() {
+  expect(2);
+
+  newView = view.createChildView(EmberView.extend({
+    init() {
+      this._super(...arguments);
+      ok(true, 'did init');
+    },
+    parentViewDidReallyChange: on('parentViewDidChange', function() {
+      ok(false, 'expected to NOT emit parentViewDidChange');
+    }),
+    controllerDidChange: observer('controller', function() {
+      ok(false, 'expected to NOT expect controller to change');
+    }),
+    parentViewDidChange: observer('parentView', function() {
+      ok(false, 'expected to NOT expect  parentViewto change');
+    })
+  }));
+
+  equal(newView.get('parentView'), view, 'expected the correct parentView');
 });
 
 QUnit.test('should set newView.parentView to receiver', function() {

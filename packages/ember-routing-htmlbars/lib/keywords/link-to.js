@@ -3,9 +3,8 @@
 @submodule ember-routing-htmlbars
 */
 
-import { readArray, readHash } from 'ember-metal/streams/utils';
 import Ember from 'ember-metal/core'; // assert
-import merge from 'ember-metal/merge';
+import { RELATED_VIEW } from 'ember-views/system/link-to';
 
 /**
   The `{{link-to}}` helper renders a link to the supplied
@@ -140,6 +139,35 @@ import merge from 'ember-metal/merge';
   To override this option for your entire application, see
   "Overriding Application-wide Defaults".
 
+  ### Keeping a link active for other routes
+
+  If you need a link to be 'active' even when it doesn't match
+  the current route, you can use the the `current-when`
+  argument.
+
+  ```handlebars
+  {{#link-to 'photoGallery' current-when='photos'}}
+    Photo Gallery
+  {{/link-to}}
+  ```
+
+  This may be helpful for keeping links active for:
+
+  * non-nested routes that are logically related
+  * some secondary menu approaches
+  * 'top navigation' with 'sub navigation' scenarios
+
+  A link will be active if `current-when` is `true` or the current
+  route is the route this link would transition to.
+
+  To match multiple routes 'space-separate' the routes:
+
+  ```handlebars
+  {{#link-to 'gallery' current-when='photos drawings paintings'}}
+    Art Gallery
+  {{/link-to}}
+  ```
+
   ### Supplying a model
   An optional model argument can be used for routes whose
   paths contain dynamic segments. This argument will become
@@ -272,7 +300,7 @@ import merge from 'ember-metal/merge';
   ```
 
   @method link-to
-  @for Ember.Handlebars.helpers
+  @for Ember.Templates.helpers
   @param {String} routeName
   @param {Object} [context]*
   @param [options] {Object} Handlebars key/value pairs of options, you can override any property of Ember.LinkComponent
@@ -286,19 +314,13 @@ export default {
   },
 
   render(morph, env, scope, params, hash, template, inverse, visitor) {
-    var attrs = merge({}, readHash(hash));
-    attrs.params = readArray(params);
+    Ember.runInDebug(() => {
+      // Used for deprecations (to tell the user what view the deprecated syntax was used in).
+      // Until: 3.0.0
+      hash[RELATED_VIEW] = env.view;
+    });
 
-    // Used for deprecations (to tell the user what view the deprecated syntax
-    // was used in).
-    attrs.view = env.view;
-
-    // TODO: Remove once `hasBlock` is working again
-    attrs.hasBlock = !!template;
-
-    attrs.escaped = !morph.parseTextAsHTML;
-
-    env.hooks.component(morph, env, scope, '-link-to', params, attrs, { default: template }, visitor);
+    env.hooks.component(morph, env, scope, '-link-to', params, hash, { default: template }, visitor);
   },
 
   rerender(morph, env, scope, params, hash, template, inverse, visitor) {

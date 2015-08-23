@@ -2,25 +2,26 @@ import Ember from 'ember-metal/core'; // Ember.A
 import { set } from 'ember-metal/property_set';
 import run from 'ember-metal/run_loop';
 import { Mixin } from 'ember-metal/mixin';
-import { fmt } from 'ember-runtime/system/string';
-import ArrayProxy from 'ember-runtime/system/array_proxy';
-import ArrayController, { arrayControllerDeprecation } from 'ember-runtime/controllers/array_controller';
 import jQuery from 'ember-views/system/jquery';
-import CollectionView from 'ember-views/views/collection_view';
+import CollectionView, { DeprecatedCollectionView } from 'ember-views/views/collection_view';
 import View from 'ember-views/views/view';
 import Registry from 'container/registry';
 import compile from 'ember-template-compiler/system/compile';
 import getElementStyle from 'ember-views/tests/test-helpers/get-element-style';
 
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
 var trim = jQuery.trim;
 var registry;
 var view;
 
-var originalLookup;
+var originalLookup, originalViewKeyword;
 
 QUnit.module('CollectionView', {
   setup() {
     CollectionView.CONTAINER_MAP.del = 'em';
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     originalLookup = Ember.lookup;
     registry = new Registry();
   },
@@ -31,6 +32,7 @@ QUnit.module('CollectionView', {
     });
 
     Ember.lookup = originalLookup;
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -129,7 +131,7 @@ QUnit.test('should allow custom item views by setting itemViewClass', function()
     view.append();
   });
 
-  content.forEach((item) => equal(view.$(':contains("'+item+'")').length, 1));
+  content.forEach((item) => equal(view.$(':contains("' + item + '")').length, 1));
 });
 
 QUnit.test('should insert a new item in DOM when an item is added to the content array', function() {
@@ -148,7 +150,7 @@ QUnit.test('should insert a new item in DOM when an item is added to the content
   });
 
   content.forEach((item) => {
-    equal(view.$(':contains("'+item+'")').length, 1, 'precond - generates pre-existing items');
+    equal(view.$(':contains("' + item + '")').length, 1, 'precond - generates pre-existing items');
   });
 
   run(function() {
@@ -172,13 +174,13 @@ QUnit.test('should remove an item from DOM when an item is removed from the cont
   run(() => view.append());
 
   content.forEach((item) => {
-    equal(view.$(':contains("'+item+'")').length, 1, 'precond - generates pre-existing items');
+    equal(view.$(':contains("' + item + '")').length, 1, 'precond - generates pre-existing items');
   });
 
   run(() => content.removeAt(1));
 
   content.forEach((item, idx) => {
-    equal(view.$(fmt(':nth-child(%@)', [String(idx+1)])).text(), item);
+    equal(view.$(`:nth-child(${idx + 1})`).text(), item);
   });
 });
 
@@ -197,7 +199,7 @@ QUnit.test('it updates the view if an item is replaced', function() {
   });
 
   content.forEach((item) => {
-    equal(view.$(':contains("'+item+'")').length, 1, 'precond - generates pre-existing items');
+    equal(view.$(':contains("' + item + '")').length, 1, 'precond - generates pre-existing items');
   });
 
   run(function() {
@@ -206,7 +208,7 @@ QUnit.test('it updates the view if an item is replaced', function() {
   });
 
   content.forEach((item, idx) => {
-    equal(trim(view.$(fmt(':nth-child(%@)', [String(idx+1)])).text()), item, 'postcond - correct array update');
+    equal(trim(view.$(`:nth-child(${idx + 1})`).text()), item, 'postcond - correct array update');
   });
 });
 
@@ -223,7 +225,7 @@ QUnit.test('can add and replace in the same runloop', function() {
   run(() => view.append());
 
   content.forEach((item) => {
-    equal(view.$(':contains("'+item+'")').length, 1, 'precond - generates pre-existing items');
+    equal(view.$(':contains("' + item + '")').length, 1, 'precond - generates pre-existing items');
   });
 
   run(() => {
@@ -233,9 +235,8 @@ QUnit.test('can add and replace in the same runloop', function() {
   });
 
   content.forEach((item, idx) => {
-    equal(trim(view.$(fmt(':nth-child(%@)', [String(idx+1)])).text()), item, 'postcond - correct array update');
+    equal(trim(view.$(`:nth-child(${idx + 1})`).text()), item, 'postcond - correct array update');
   });
-
 });
 
 QUnit.test('can add and replace the object before the add in the same runloop', function() {
@@ -251,7 +252,7 @@ QUnit.test('can add and replace the object before the add in the same runloop', 
   run(() => view.append());
 
   content.forEach((item) => {
-    equal(view.$(':contains("'+item+'")').length, 1, 'precond - generates pre-existing items');
+    equal(view.$(':contains("' + item + '")').length, 1, 'precond - generates pre-existing items');
   });
 
   run(() => {
@@ -261,7 +262,7 @@ QUnit.test('can add and replace the object before the add in the same runloop', 
   });
 
   content.forEach((item, idx) => {
-    equal(trim(view.$(fmt(':nth-child(%@)', [String(idx+1)])).text()), item, 'postcond - correct array update');
+    equal(trim(view.$(`:nth-child(${idx + 1})`).text()), item, 'postcond - correct array update');
   });
 });
 
@@ -278,7 +279,7 @@ QUnit.test('can add and replace complicatedly', function() {
   run(() => view.append());
 
   content.forEach((item) => {
-    equal(view.$(':contains("'+item+'")').length, 1, 'precond - generates pre-existing items');
+    equal(view.$(':contains("' + item + '")').length, 1, 'precond - generates pre-existing items');
   });
 
   run(() => {
@@ -290,7 +291,7 @@ QUnit.test('can add and replace complicatedly', function() {
   });
 
   content.forEach((item, idx) => {
-    equal(trim(view.$(fmt(':nth-child(%@)', [String(idx+1)])).text()), item, 'postcond - correct array update: '+item.name+'!='+view.$(fmt(':nth-child(%@)', [String(idx+1)])).text());
+    equal(trim(view.$(`:nth-child(${idx + 1})`).text()), item, 'postcond - correct array update: ' + item.name + '!=' + view.$(`:nth-child(${idx + 1})`).text());
   });
 });
 
@@ -309,7 +310,7 @@ QUnit.test('can add and replace complicatedly harder', function() {
   });
 
   content.forEach((item) => {
-    equal(view.$(':contains("'+item+'")').length, 1, 'precond - generates pre-existing items');
+    equal(view.$(':contains("' + item + '")').length, 1, 'precond - generates pre-existing items');
   });
 
   run(function() {
@@ -322,7 +323,7 @@ QUnit.test('can add and replace complicatedly harder', function() {
   });
 
   content.forEach((item, idx) => {
-    equal(trim(view.$(fmt(':nth-child(%@)', [String(idx+1)])).text()), item, 'postcond - correct array update');
+    equal(trim(view.$(`:nth-child(${idx + 1})`).text()), item, 'postcond - correct array update');
   });
 });
 
@@ -405,7 +406,7 @@ QUnit.test('should fire life cycle events when elements are added and removed', 
   equal(trim(view.$().text()), '123');
 
   run(function () {
-    view.set('content', Ember.A([7,8,9]));
+    view.set('content', Ember.A([7, 8, 9]));
   });
 
   equal(didInsertElement, 8);
@@ -505,37 +506,6 @@ QUnit.test('should not render the emptyView if content is emptied and refilled i
   equal(view.$().find('kbd:contains("OY SORRY GUVNAH")').length, 0);
 });
 
-QUnit.test('a array_proxy that backs an sorted array_controller that backs a collection view functions properly', function() {
-  expectDeprecation(arrayControllerDeprecation);
-  var array = Ember.A([{ name: 'Other Katz' }]);
-  var arrayProxy = ArrayProxy.create({ content: array });
-
-  var sortedController = ArrayController.create({
-    content: arrayProxy,
-    sortProperties: ['name']
-  });
-
-  var container = CollectionView.create({
-    content: sortedController
-  });
-
-  run(function() {
-    container.appendTo('#qunit-fixture');
-  });
-
-  run(function() {
-    arrayProxy.addObjects([{ name: 'Scumbag Demon' }, { name: 'Lord British' }]);
-  });
-
-  equal(container.get('content.length'), 3, 'ArrayController should have 3 entries');
-  equal(container.get('content.content.length'), 3, 'RecordArray should have 3 entries');
-  equal(container.get('childViews.length'), 3, 'CollectionView should have 3 entries');
-
-  run(function() {
-    container.destroy();
-  });
-});
-
 QUnit.test('when a collection view is emptied, deeply nested views elements are not removed from the DOM and then destroyed again', function() {
   var gotDestroyed = [];
 
@@ -598,32 +568,6 @@ QUnit.test('should render the emptyView if content array is empty and emptyView 
   ok(view.$().find('kbd:contains("THIS IS AN EMPTY VIEW")').length, 'displays empty view');
 });
 
-QUnit.test('should render the emptyView if content array is empty and emptyView is given as global string [DEPRECATED]', function() {
-  expectDeprecation(/Resolved the view "App.EmptyView" on the global context/);
-
-  Ember.lookup = {
-    App: {
-      EmptyView: View.extend({
-        tagName: 'kbd',
-        template: compile('THIS IS AN EMPTY VIEW')
-      })
-    }
-  };
-
-  view = CollectionView.create({
-    tagName: 'del',
-    content: Ember.A(),
-
-    emptyView: 'App.EmptyView'
-  });
-
-  run(function() {
-    view.append();
-  });
-
-  ok(view.$().find('kbd:contains("THIS IS AN EMPTY VIEW")').length, 'displays empty view');
-});
-
 QUnit.test('should lookup against the container if itemViewClass is given as a string', function() {
   var ItemView = View.extend({
     template: compile('{{view.content}}')
@@ -642,7 +586,6 @@ QUnit.test('should lookup against the container if itemViewClass is given as a s
   });
 
   equal(view.$('.ember-view').length, 4);
-
 });
 
 QUnit.test('should lookup only global path against the container if itemViewClass is given as a string', function() {
@@ -725,5 +668,19 @@ QUnit.test('Collection with style attribute supports changing content', function
   run(function() {
     view.get('content').pushObject('baz');
   });
+});
 
+QUnit.module('DeprecatedCollectionView [LEGACY]');
+
+QUnit.test('calling reopen on DeprecatedCollectionView delegates to CollectionView', function() {
+  expect(2);
+  var originalReopen = CollectionView.reopen;
+  var obj = {};
+
+  CollectionView.reopen = function(arg) { ok(arg === obj); };
+
+  expectNoDeprecation();
+  DeprecatedCollectionView.reopen(obj);
+
+  CollectionView.reopen = originalReopen;
 });

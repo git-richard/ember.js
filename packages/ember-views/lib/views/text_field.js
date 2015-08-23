@@ -4,11 +4,12 @@
 */
 import { computed } from 'ember-metal/computed';
 import environment from 'ember-metal/environment';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
 import TextSupport from 'ember-views/mixins/text_support';
+import EmptyObject from 'ember-metal/empty_object';
 
 var inputTypeTestElement;
-var inputTypes = Object.create(null);
+var inputTypes = new EmptyObject();
 function canSetTypeOfInput(type) {
   if (type in inputTypes) {
     return inputTypes[type];
@@ -38,7 +39,7 @@ function canSetTypeOfInput(type) {
   The internal class used to create text inputs when the `{{input}}`
   helper is used with `type` of `text`.
 
-  See [Handlebars.helpers.input](/api/classes/Ember.Handlebars.helpers.html#method_input)  for usage details.
+  See [Ember.Templates.helpers.input](/api/classes/Ember.Templates.helpers.html#method_input)  for usage details.
 
   ## Layout and LayoutName properties
 

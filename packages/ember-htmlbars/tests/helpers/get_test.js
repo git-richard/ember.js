@@ -1,19 +1,20 @@
 import Ember from 'ember-metal/core';
-import isEnabled from 'ember-metal/features';
 import run from 'ember-metal/run_loop';
 import { Registry } from 'ember-runtime/system/container';
 import compile from 'ember-template-compiler/system/compile';
 import { runAppend, runDestroy } from 'ember-runtime/tests/utils';
 import EmberView from 'ember-views/views/view';
+import ComponentLookup from 'ember-views/component_lookup';
+import TextField from 'ember-views/views/text_field';
 
 var view, registry, container;
 
-// jscs:disable validateIndentation
-if (isEnabled('ember-htmlbars-get-helper')) {
-
-  QUnit.module('ember-htmlbars: {{get}} helper', {
+QUnit.module('ember-htmlbars: {{get}} helper', {
   setup() {
     registry = new Registry();
+    registry.register('component:-text-field', TextField);
+    registry.register('component-lookup:main', ComponentLookup);
+
     container = registry.container();
     registry.optionsForType('template', { instantiate: false });
   },
@@ -27,7 +28,7 @@ if (isEnabled('ember-htmlbars-get-helper')) {
   }
 });
 
-  QUnit.test('should be able to get an object value with a static key', function() {
+QUnit.test('should be able to get an object value with a static key', function() {
   var context = {
     colors: { apple: 'red', banana: 'yellow' }
   };
@@ -46,9 +47,15 @@ if (isEnabled('ember-htmlbars-get-helper')) {
   });
 
   equal(view.$().text(), '[green] [green]', 'should return \'green\' for {{get colors \'apple\'}}');
+
+  run(function() {
+    view.set('context.colors.apple', 'red');
+  });
+
+  equal(view.$().text(), '[red] [red]', 'should return \'red\' for {{get colors \'apple\'}}');
 });
 
-  QUnit.test('should be able to get an object value with a bound/dynamic key', function() {
+QUnit.test('should be able to get an object value with a bound/dynamic key', function() {
   var context = {
     colors: { apple: 'red', banana: 'yellow' },
     key: 'apple'
@@ -81,9 +88,14 @@ if (isEnabled('ember-htmlbars-get-helper')) {
 
   equal(view.$().text(), '[green] [green]', 'should return \'green\' for {{get colors key}} (key = \'apple\')');
 
+  run(function() {
+    view.set('context.colors.apple', 'red');
+  });
+
+  equal(view.$().text(), '[red] [red]', 'should return \'red\' for {{get colors key}}  (key = \'apple\')');
 });
 
-  QUnit.test('should be able to get an object value with a GetStream key', function() {
+QUnit.test('should be able to get an object value with a GetStream key', function() {
   var context = {
     colors: { apple: 'red', banana: 'yellow' },
     key: 'key1',
@@ -117,9 +129,14 @@ if (isEnabled('ember-htmlbars-get-helper')) {
 
   equal(view.$().text(), '[green] [green]', 'should return \'green\'');
 
+  run(function() {
+    view.set('context.colors.apple', 'red');
+  });
+
+  equal(view.$().text(), '[red] [red]', 'should return \'red\'');
 });
 
-  QUnit.test('should be able to get an object value with a GetStream value and bound/dynamic key', function() {
+QUnit.test('should be able to get an object value with a GetStream value and bound/dynamic key', function() {
   var context = {
     possibleValues: {
       colors1: { apple: 'red', banana: 'yellow' },
@@ -167,10 +184,9 @@ if (isEnabled('ember-htmlbars-get-helper')) {
   });
 
   equal(view.$().text(), '[yellow] [yellow]', 'should return \'yellow\'');
-
 });
 
-  QUnit.test('should be able to get an object value with a GetStream value and GetStream key', function() {
+QUnit.test('should be able to get an object value with a GetStream value and GetStream key', function() {
   var context = {
     possibleValues: {
       colors1: { apple: 'red', banana: 'yellow' },
@@ -222,10 +238,9 @@ if (isEnabled('ember-htmlbars-get-helper')) {
   });
 
   equal(view.$().text(), '[yellow] [yellow]', 'should return \'yellow\'');
-
 });
 
-  QUnit.test('should handle object values as nulls', function() {
+QUnit.test('should handle object values as nulls', function() {
   var context = {
     colors: null
   };
@@ -252,7 +267,7 @@ if (isEnabled('ember-htmlbars-get-helper')) {
   equal(view.$().text(), '[] []', 'should return \'\' for {{get colors \'apple\'}} (colors = null)');
 });
 
-  QUnit.test('should handle object keys as nulls', function() {
+QUnit.test('should handle object keys as nulls', function() {
   var context = {
     colors: { apple: 'red', banana: 'yellow' },
     key: null
@@ -278,10 +293,9 @@ if (isEnabled('ember-htmlbars-get-helper')) {
   });
 
   equal(view.$().text(), '[] []', 'should return \'\' for {{get colors key}}  (key = null)');
-
 });
 
-  QUnit.test('should handle object values and keys as nulls', function() {
+QUnit.test('should handle object values and keys as nulls', function() {
   var context = {
     colors: null,
     key: null
@@ -297,5 +311,68 @@ if (isEnabled('ember-htmlbars-get-helper')) {
   equal(view.$().text(), '[] []', 'should return \'\' for {{get colors key}}  (colors=null, key = null)');
 });
 
-}
-// jscs:enable validateIndentation
+QUnit.test('get helper value should be updatable using {{input}} and (mut) - dynamic key', function() {
+  var context = {
+    source: Ember.Object.create({
+      banana: 'banana'
+    }),
+    key: 'banana'
+  };
+
+  view = EmberView.create({
+    context: context,
+    container: container,
+    template: compile(`{{input type='text' value=(mut (get source key)) id='get-input'}}`)
+  });
+
+  runAppend(view);
+
+  equal(view.$('#get-input').val(), 'banana');
+
+  run(function() {
+    view.set('context.source.banana', 'yellow');
+  });
+
+  equal(view.$('#get-input').val(), 'yellow');
+
+  run(function() {
+    view.$('#get-input').val('some value');
+    view.childViews[0]._elementValueDidChange();
+  });
+
+  equal(view.$('#get-input').val(), 'some value');
+  equal(view.get('context.source.banana'), 'some value');
+});
+
+QUnit.test('get helper value should be updatable using {{input}} and (mut) - static key', function() {
+  var context = {
+    source: Ember.Object.create({
+      banana: 'banana'
+    }),
+    key: 'banana'
+  };
+
+  view = EmberView.create({
+    context: context,
+    container: container,
+    template: compile(`{{input type='text' value=(mut (get source 'banana')) id='get-input'}}`)
+  });
+
+  runAppend(view);
+
+  equal(view.$('#get-input').val(), 'banana');
+
+  run(function() {
+    view.set('context.source.banana', 'yellow');
+  });
+
+  equal(view.$('#get-input').val(), 'yellow');
+
+  run(function() {
+    view.$('#get-input').val('some value');
+    view.childViews[0]._elementValueDidChange();
+  });
+
+  equal(view.$('#get-input').val(), 'some value');
+  equal(view.get('context.source.banana'), 'some value');
+});

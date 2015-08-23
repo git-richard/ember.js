@@ -1,5 +1,5 @@
 import Ember from 'ember-metal/core';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
 import Helper, { helper as makeHelper } from 'ember-htmlbars/helper';
 import compile from 'ember-template-compiler/system/compile';
 import { runAppend, runDestroy } from 'ember-runtime/tests/utils';
@@ -244,6 +244,19 @@ QUnit.test('dashed helper not usable with a block', function() {
   expectAssertion(function() {
     runAppend(component);
   }, /Helpers may not be used in the block form/);
+});
+
+QUnit.test('dashed helper not usable within element', function() {
+  var SomeHelper = makeHelper(function() {});
+  registry.register('helper:some-helper', SomeHelper);
+  component = Component.extend({
+    container,
+    layout: compile(`<div {{some-helper}}></div>`)
+  }).create();
+
+  expectAssertion(function() {
+    runAppend(component);
+  }, /Helpers may not be used in the element form/);
 });
 
 QUnit.test('dashed helper is torn down', function() {

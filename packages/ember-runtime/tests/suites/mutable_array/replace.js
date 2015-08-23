@@ -5,7 +5,6 @@ var suite = SuiteModuleBuilder.create();
 suite.module('replace');
 
 suite.test('[].replace(0,0,\'X\') => [\'X\'] + notify', function() {
-
   var obj, exp, observer;
   exp = this.newFixture(1);
   obj = this.newObject([]);
@@ -17,7 +16,7 @@ suite.test('[].replace(0,0,\'X\') => [\'X\'] + notify', function() {
   deepEqual(this.toArray(obj), exp, 'post item results');
 
   equal(observer.timesCalled('[]'), 1, 'should have notified [] once');
-  equal(observer.timesCalled('@each'), 1, 'should have notified @each once');
+  equal(observer.timesCalled('@each'), 0, 'should not have notified @each once');
   equal(observer.timesCalled('length'), 1, 'should have notified length once');
   equal(observer.timesCalled('firstObject'), 1, 'should have notified firstObject once');
   equal(observer.timesCalled('lastObject'), 1, 'should have notified lastObject once');
@@ -39,7 +38,7 @@ suite.test('[A,B,C,D].replace(1,2,X) => [A,X,D] + notify', function() {
   deepEqual(this.toArray(obj), after, 'post item results');
 
   equal(observer.timesCalled('[]'), 1, 'should have notified [] once');
-  equal(observer.timesCalled('@each'), 1, 'should have notified @each once');
+  equal(observer.timesCalled('@each'), 0, 'should not have notified @each once');
   equal(observer.timesCalled('length'), 1, 'should have notified length once');
 
   equal(observer.validate('firstObject'), false, 'should NOT have notified firstObject once');
@@ -62,7 +61,7 @@ suite.test('[A,B,C,D].replace(1,2,[X,Y]) => [A,X,Y,D] + notify', function() {
   deepEqual(this.toArray(obj), after, 'post item results');
 
   equal(observer.timesCalled('[]'), 1, 'should have notified [] once');
-  equal(observer.timesCalled('@each'), 1, 'should have notified @each once');
+  equal(observer.timesCalled('@each'), 0, 'should not have notified @each once');
   equal(observer.validate('length'), false, 'should NOT have notified length');
 
   equal(observer.validate('firstObject'), false, 'should NOT have notified firstObject once');
@@ -85,7 +84,7 @@ suite.test('[A,B].replace(1,0,[X,Y]) => [A,X,Y,B] + notify', function() {
   deepEqual(this.toArray(obj), after, 'post item results');
 
   equal(observer.timesCalled('[]'), 1, 'should have notified [] once');
-  equal(observer.timesCalled('@each'), 1, 'should have notified @each once');
+  equal(observer.timesCalled('@each'), 0, 'should not have notified @each once');
   equal(observer.timesCalled('length'), 1, 'should have notified length once');
 
   equal(observer.validate('firstObject'), false, 'should NOT have notified firstObject once');
@@ -107,7 +106,7 @@ suite.test('[A,B,C,D].replace(2,2) => [A,B] + notify', function() {
   deepEqual(this.toArray(obj), after, 'post item results');
 
   equal(observer.timesCalled('[]'), 1, 'should have notified [] once');
-  equal(observer.timesCalled('@each'), 1, 'should have notified @each once');
+  equal(observer.timesCalled('@each'), 0, 'should not have notified @each once');
   equal(observer.timesCalled('length'), 1, 'should have notified length once');
   equal(observer.timesCalled('lastObject'), 1, 'should have notified lastObject once');
 
@@ -115,7 +114,6 @@ suite.test('[A,B,C,D].replace(2,2) => [A,B] + notify', function() {
 });
 
 suite.test('Adding object should notify enumerable observer', function() {
-
   var fixtures = this.newFixture(4);
   var obj = this.newObject(fixtures);
   var observer = this.newObserver(obj).observeEnumerable(obj);
@@ -128,7 +126,6 @@ suite.test('Adding object should notify enumerable observer', function() {
 });
 
 suite.test('Adding object should notify array observer', function() {
-
   var fixtures = this.newFixture(4);
   var obj = this.newObject(fixtures);
   var observer = this.newObserver(obj).observeArray(obj);

@@ -1,9 +1,9 @@
 import Ember from 'ember-metal/core'; // warn, assert, etc;
 import { get, normalizeTuple } from 'ember-metal/property_get';
-import { meta as metaFor } from 'ember-metal/utils';
+import { meta as metaFor } from 'ember-metal/meta';
 import { watchKey, unwatchKey } from 'ember-metal/watch_key';
+import EmptyObject from 'ember-metal/empty_object';
 
-var warn = Ember.warn;
 var FIRST_KEY = /^([^\.]+)/;
 
 function firstKey(path) {
@@ -15,14 +15,95 @@ function isObject(obj) {
 }
 
 function isVolatile(obj) {
-  return !(isObject(obj) && obj.isDescriptor && obj._cacheable);
+  return !(isObject(obj) && obj.isDescriptor && obj._volatile === false);
 }
 
-function Chains() {
-
+function ChainWatchers(obj) {
+  // this obj would be the referencing chain node's parent node's value
+  this.obj = obj;
+  // chain nodes that reference a key in this obj by key
+  // we only create ChainWatchers when we are going to add them
+  // so create this upfront
+  this.chains = new EmptyObject();
 }
 
-Chains.prototype = Object.create(null);
+ChainWatchers.prototype = {
+  add(key, node) {
+    let nodes = this.chains[key];
+    if (nodes === undefined) {
+      this.chains[key] = [node];
+    } else {
+      nodes.push(node);
+    }
+  },
+
+  remove(key, node) {
+    let nodes = this.chains[key];
+    if (nodes) {
+      for (var i = 0, l = nodes.length; i < l; i++) {
+        if (nodes[i] === node) {
+          nodes.splice(i, 1);
+          break;
+        }
+      }
+    }
+  },
+
+  has(key, node) {
+    let nodes = this.chains[key];
+    if (nodes) {
+      for (var i = 0, l = nodes.length; i < l; i++) {
+        if (nodes[i] === node) {
+          return true;
+        }
+      }
+    }
+    return false;
+  },
+
+  revalidateAll() {
+    for (let key in this.chains) {
+      this.notify(key, true, undefined);
+    }
+  },
+
+  revalidate(key) {
+    this.notify(key, true, undefined);
+  },
+
+  // key: the string key that is part of a path changed
+  // revalidate: boolean the chains that are watching this value should revalidate
+  // callback: function that will be called with the the object and path that
+  //           will be/are invalidated by this key change depending on the
+  //           whether the revalidate flag is passed
+  notify(key, revalidate, callback) {
+    let nodes = this.chains[key];
+    if (nodes === undefined || nodes.length === 0) {
+      return;
+    }
+
+    let affected;
+
+    if (callback) {
+      affected = [];
+    }
+
+    for (let i = 0, l = nodes.length; i < l; i++) {
+      nodes[i].notify(revalidate, affected);
+    }
+
+    if (callback === undefined) {
+      return;
+    }
+
+    // we gather callbacks so we don't notify them during revalidation
+    for (let i = 0, l = affected.length; i < l; i += 2) {
+      let obj  = affected[i];
+      let path = affected[i + 1];
+      callback(obj, path);
+    }
+  }
+};
 
 var pendingQueue = [];
 
@@ -39,8 +120,16 @@ export function flushPendingChains() {
 
   queue.forEach((q) => q[0].add(q[1]));
 
-  warn('Watching an undefined global, Ember expects watched globals to be' +
-       ' setup by the time the run loop is flushed, check for typos', pendingQueue.length === 0);
+  Ember.warn(
+    'Watching an undefined global, Ember expects watched globals to be ' +
+    'setup by the time the run loop is flushed, check for typos',
+    pendingQueue.length === 0,
+    { id: 'ember-metal.chains-flush-pending-chains' }
+  );
+}
+
+function makeChainWatcher(obj) {
+  return new ChainWatchers(obj);
 }
 
 function addChainWatcher(obj, keyName, node) {
@@ -48,19 +137,8 @@ function addChainWatcher(obj, keyName, node) {
     return;
   }
 
-  var m = metaFor(obj);
-  var nodes = m.chainWatchers;
-
-  if (!m.hasOwnProperty('chainWatchers')) { // FIXME?!
-    nodes = m.chainWatchers = new Chains();
-  }
-
-  if (!nodes[keyName]) {
-    nodes[keyName] = [node];
-  } else {
-    nodes[keyName].push(node);
-  }
-
+  let m = metaFor(obj);
+  m.writableChainWatchers(makeChainWatcher).add(keyName, node);
   watchKey(obj, keyName, m);
 }
 
@@ -69,20 +147,17 @@ function removeChainWatcher(obj, keyName, node) {
     return;
   }
 
-  var m = obj['__ember_meta__'];
-  if (m && !m.hasOwnProperty('chainWatchers')) { return; } // nothing to do
+  let m = obj.__ember_meta__;
 
-  var nodes = m && m.chainWatchers;
-
-  if (nodes && nodes[keyName]) {
-    nodes = nodes[keyName];
-    for (var i = 0, l = nodes.length; i < l; i++) {
-      if (nodes[i] === node) {
-        nodes.splice(i, 1);
-        break;
-      }
-    }
+  if (!m || !m.readableChainWatchers()) {
+    return;
   }
+
+  // make meta writable
+  m = metaFor(obj);
+
+  m.readableChainWatchers().remove(keyName, node);
+
   unwatchKey(obj, keyName, m);
 }
 
@@ -113,15 +188,6 @@ function ChainNode(parent, key, value) {
       addChainWatcher(this._object, this._key, this);
     }
   }
-
-  // Special-case: the EachProxy relies on immediate evaluation to
-  // establish its observers.
-  //
-  // TODO: Replace this with an efficient callback that the EachProxy
-  // can implement.
-  if (this._parent && this._parent._key === '@each') {
-    this.value();
-  }
 }
 
 function lazyGet(obj, key) {
@@ -137,12 +203,13 @@ function lazyGet(obj, key) {
   }
 
   // Use `get` if the return value is an EachProxy or an uncacheable value.
-  if (key === '@each' || isVolatile(obj[key])) {
+  if (isVolatile(obj[key])) {
     return get(obj, key);
   // Otherwise attempt to get the cached value of the computed property
   } else {
-    if (meta.cache && key in meta.cache) {
-      return meta.cache[key];
+    let cache = meta.readableCache();
+    if (cache && key in cache) {
+      return cache[key];
     }
   }
 }
@@ -247,7 +314,7 @@ ChainNode.prototype = {
     var chains = this._chains;
     var node;
     if (chains === undefined) {
-      chains = this._chains = new Chains();
+      chains = this._chains = new EmptyObject();
     } else {
       node = chains[key];
     }
@@ -285,44 +352,8 @@ ChainNode.prototype = {
     }
   },
 
-  willChange(events) {
-    var chains = this._chains;
-    var node;
-    if (chains) {
-      for (var key in chains) {
-        node = chains[key];
-        if (node !== undefined) {
-          node.willChange(events);
-        }
-      }
-    }
-
-    if (this._parent) {
-      this._parent.notifyChainChange(this, this._key, 1, events);
-    }
-  },
-
-  notifyChainChange(chain, path, depth, events) {
-    if (this._key) {
-      path = this._key + '.' + path;
-    }
-
-    if (this._parent) {
-      this._parent.notifyChainChange(this, path, depth + 1, events);
-    } else {
-      if (depth > 1) {
-        events.push(this.value(), path);
-      }
-      path = 'this.' + path;
-      if (this._paths[path] > 0) {
-        events.push(this.value(), path);
-      }
-    }
-  },
-
-  didChange(events) {
-    // invalidate my own value first.
-    if (this._watching) {
+  notify(revalidate, affected) {
+    if (revalidate && this._watching) {
       var obj = this._parent.value();
       if (obj !== this._object) {
         removeChainWatcher(this._object, this._key, this);
@@ -330,12 +361,6 @@ ChainNode.prototype = {
         addChainWatcher(obj, this._key, this);
       }
       this._value  = undefined;
-
-      // Special-case: the EachProxy relies on immediate evaluation to
-      // establish its observers.
-      if (this._parent && this._parent._key === '@each') {
-        this.value();
-      }
     }
 
     // then notify chains...
@@ -345,48 +370,50 @@ ChainNode.prototype = {
       for (var key in chains) {
         node = chains[key];
         if (node !== undefined) {
-          node.didChange(events);
+          node.notify(revalidate, affected);
         }
       }
     }
 
-    // if no events are passed in then we only care about the above wiring update
-    if (events === null) {
-      return;
+    if (affected && this._parent) {
+      this._parent.populateAffected(this, this._key, 1, affected);
+    }
+  },
+
+  populateAffected(chain, path, depth, affected) {
+    if (this._key) {
+      path = this._key + '.' + path;
     }
 
-    // and finally tell parent about my path changing...
     if (this._parent) {
-      this._parent.notifyChainChange(this, this._key, 1, events);
+      this._parent.populateAffected(this, path, depth + 1, affected);
+    } else {
+      if (depth > 1) {
+        affected.push(this.value(), path);
+      }
+      path = 'this.' + path;
+      if (this._paths[path] > 0) {
+        affected.push(this.value(), path);
+      }
     }
   }
 };
 
 export function finishChains(obj) {
   // We only create meta if we really have to
-  var m = obj['__ember_meta__'];
-  var chains, chainWatchers, chainNodes;
-
+  let m = obj.__ember_meta__;
   if (m) {
+    m = metaFor(obj);
+
     // finish any current chains node watchers that reference obj
-    chainWatchers = m.chainWatchers;
+    let chainWatchers = m.readableChainWatchers();
     if (chainWatchers) {
-      for (var key in chainWatchers) {
-        chainNodes = chainWatchers[key];
-        if (chainNodes) {
-          for (var i = 0, l = chainNodes.length; i < l; i++) {
-            var node = chainNodes[i];
-            if (node) {
-              node.didChange(null);
-            }
-          }
-        }
-      }
+      chainWatchers.revalidateAll();
     }
-    // copy chains from prototype
-    chains = m.chains;
-    if (chains && chains.value() !== obj) {
-      metaFor(obj).chains = chains = chains.copy(obj);
+    // ensure that if we have inherited any chains they have been
+    // copied onto our own meta.
+    if (m.readableChains()) {
+      m.writableChains();
     }
   }
 }

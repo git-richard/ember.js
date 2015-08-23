@@ -1,10 +1,7 @@
 import 'ember';
 import Ember from 'ember-metal/core';
 import isEnabled from 'ember-metal/features';
-
-import EmberHandlebars from 'ember-htmlbars/compat';
-
-var compile = EmberHandlebars.compile;
+import { compile } from 'ember-template-compiler';
 
 var Router, App, router, registry, container;
 var set = Ember.set;
@@ -54,7 +51,7 @@ function sharedSetup() {
   });
 
   Router = App.Router;
-  registry = App.registry;
+  registry = App.__registry__;
   container = App.__container__;
 }
 
@@ -214,6 +211,56 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     equal(Ember.$('#the-link').attr('href'), '/?bar=BORF&foo=lol');
   });
 
+  QUnit.test('The {{link-to}} with only query params always transitions to the current route with the query params applied', function() {
+    // Test harness for bug #12033
+
+    Ember.TEMPLATES.cars = compile(
+      '{{#link-to \'cars.create\' id=\'create-link\'}}Create new car{{/link-to}} ' +
+      '{{#link-to (query-params page=\'2\') id=\'page2-link\'}}Page 2{{/link-to}}' +
+      '{{outlet}}'
+    );
+
+    Ember.TEMPLATES['cars/create'] = compile(
+      '{{#link-to \'cars\' id=\'close-link\'}}Close create form{{/link-to}}'
+    );
+
+    Router.map(function() {
+      this.route('cars', function() {
+        this.route('create');
+      });
+    });
+
+    App.CarsRoute = Ember.Route.extend({
+      queryParams: {
+        page: { defaultValue: 1 }
+      }
+    });
+
+    bootApplication();
+
+    Ember.run(function() {
+      router.handleURL('/cars/create');
+    });
+
+    Ember.run(function() {
+      equal(router.currentRouteName, 'cars.create');
+      Ember.$('#close-link').click();
+    });
+
+    Ember.run(function() {
+      equal(router.currentRouteName, 'cars.index');
+      equal(router.get('url'), '/cars');
+      equal(container.lookup('controller:cars').get('page'), 1, 'The page query-param is 1');
+      Ember.$('#page2-link').click();
+    });
+
+    Ember.run(function() {
+      equal(router.currentRouteName, 'cars.index', 'The active route is still cars');
+      equal(router.get('url'), '/cars?page=2', 'The url has been updated');
+      equal(container.lookup('controller:cars').get('page'), 2, 'The query params have been updated');
+    });
+  });
+
   QUnit.test('The {{link-to}} applies activeClass when query params are not changed', function() {
     Ember.TEMPLATES.index = compile(
       '{{#link-to (query-params foo=\'cat\') id=\'cat-link\'}}Index{{/link-to}} ' +
@@ -353,8 +400,8 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     });
 
     App.IndexController = Ember.Controller.extend({
-      pagesArray: [1,2],
-      biggerArray: [1,2,3],
+      pagesArray: [1, 2],
+      biggerArray: [1, 2, 3],
       emptyArray: []
     });
 
@@ -581,6 +628,57 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     equal(Ember.$('#the-link').attr('href'), '/?bar=BORF&foo=lol');
   });
 
+  QUnit.test('The {{link-to}} with only query params always transitions to the current route with the query params applied', function() {
+    // Test harness for bug #12033
+
+    Ember.TEMPLATES.cars = compile(
+      '{{#link-to \'cars.create\' id=\'create-link\'}}Create new car{{/link-to}} ' +
+      '{{#link-to (query-params page=\'2\') id=\'page2-link\'}}Page 2{{/link-to}}' +
+      '{{outlet}}'
+    );
+
+    Ember.TEMPLATES['cars/create'] = compile(
+      '{{#link-to \'cars\' id=\'close-link\'}}Close create form{{/link-to}}'
+    );
+
+    Router.map(function() {
+      this.route('cars', function() {
+        this.route('create');
+      });
+    });
+
+    App.CarsController = Ember.Controller.extend({
+      queryParams: ['page'],
+      page: 1
+    });
+
+    bootApplication();
+
+    var carsController = container.lookup('controller:cars');
+
+    Ember.run(function() {
+      router.handleURL('/cars/create');
+    });
+
+    Ember.run(function() {
+      equal(router.currentRouteName, 'cars.create');
+      Ember.$('#close-link').click();
+    });
+
+    Ember.run(function() {
+      equal(router.currentRouteName, 'cars.index');
+      equal(router.get('url'), '/cars');
+      equal(carsController.get('page'), 1, 'The page query-param is 1');
+      Ember.$('#page2-link').click();
+    });
+
+    Ember.run(function() {
+      equal(router.currentRouteName, 'cars.index', 'The active route is still cars');
+      equal(router.get('url'), '/cars?page=2', 'The url has been updated');
+      equal(carsController.get('page'), 2, 'The query params have been updated');
+    });
+  });
+
   QUnit.test('The {{link-to}} applies activeClass when query params are not changed', function() {
     Ember.TEMPLATES.index = compile(
       '{{#link-to (query-params foo=\'cat\') id=\'cat-link\'}}Index{{/link-to}} ' +
@@ -698,8 +796,8 @@ if (isEnabled('ember-routing-route-configured-query-params')) {
     App.IndexController = Ember.Controller.extend({
       queryParams: ['pages'],
       pages: [],
-      pagesArray: [1,2],
-      biggerArray: [1,2,3],
+      pagesArray: [1, 2],
+      biggerArray: [1, 2, 3],
       emptyArray: []
     });
 

@@ -24,11 +24,11 @@ function cleanup() {
     App = null;
     Ember.TEMPLATES = {};
 
-    cleanupHandlebarsHelpers();
+    cleanupHelpers();
   });
 }
 
-function cleanupHandlebarsHelpers() {
+function cleanupHelpers() {
   var currentHelpers = Ember.A(keys(helpers));
 
   currentHelpers.forEach(function(name) {
@@ -56,7 +56,7 @@ function boot(callback, startURL='/') {
       location: 'none'
     });
 
-    registry = App.registry;
+    registry = App.__registry__;
     container = App.__container__;
 
     if (callback) { callback(); }
@@ -86,16 +86,13 @@ QUnit.test('If a component is registered, it is used', function() {
 });
 
 
-QUnit.test('Late-registered components can be rendered with custom `template` property (DEPRECATED)', function() {
-
+QUnit.test('Late-registered components can be rendered with custom `layout` property', function() {
   Ember.TEMPLATES.application = compile('<div id=\'wrapper\'>there goes {{my-hero}}</div>');
-
-  expectDeprecation(/Do not specify template on a Component/);
 
   boot(function() {
     registry.register('component:my-hero', Ember.Component.extend({
       classNames: 'testing123',
-      template: compile('watch him as he GOES')
+      layout: compile('watch him as he GOES')
     }));
   });
 
@@ -104,7 +101,6 @@ QUnit.test('Late-registered components can be rendered with custom `template` pr
 });
 
 QUnit.test('Late-registered components can be rendered with template registered on the container', function() {
-
   Ember.TEMPLATES.application = compile('<div id=\'wrapper\'>hello world {{sally-rutherford}}-{{#sally-rutherford}}!!!{{/sally-rutherford}}</div>');
 
   boot(function() {
@@ -117,7 +113,6 @@ QUnit.test('Late-registered components can be rendered with template registered 
 });
 
 QUnit.test('Late-registered components can be rendered with ONLY the template registered on the container', function() {
-
   Ember.TEMPLATES.application = compile('<div id=\'wrapper\'>hello world {{borf-snorlax}}-{{#borf-snorlax}}!!!{{/borf-snorlax}}</div>');
 
   boot(function() {
@@ -129,7 +124,6 @@ QUnit.test('Late-registered components can be rendered with ONLY the template re
 });
 
 QUnit.test('Component-like invocations are treated as bound paths if neither template nor component are registered on the container', function() {
-
   Ember.TEMPLATES.application = compile('<div id=\'wrapper\'>{{user-name}} hello {{api-key}} world</div>');
 
   boot(function() {
@@ -141,14 +135,12 @@ QUnit.test('Component-like invocations are treated as bound paths if neither tem
   equal(Ember.$('#wrapper').text(), 'machty hello  world', 'The component is composed correctly');
 });
 
-QUnit.test('Assigning templateName to a component should setup the template as a layout (DEPRECATED)', function() {
-  expect(2);
+QUnit.test('Assigning templateName to a component should setup the template as a layout', function() {
+  expect(1);
 
   Ember.TEMPLATES.application = compile('<div id=\'wrapper\'>{{#my-component}}{{text}}{{/my-component}}</div>');
   Ember.TEMPLATES['foo-bar-baz'] = compile('{{text}}-{{yield}}');
 
-  expectDeprecation(/Do not specify templateName on a Component/);
-
   boot(function() {
     registry.register('controller:application', Ember.Controller.extend({
       'text': 'outer'
@@ -156,30 +148,7 @@ QUnit.test('Assigning templateName to a component should setup the template as a
 
     registry.register('component:my-component', Ember.Component.extend({
       text: 'inner',
-      templateName: 'foo-bar-baz'
-    }));
-  });
-
-  equal(Ember.$('#wrapper').text(), 'inner-outer', 'The component is composed correctly');
-});
-
-QUnit.test('Assigning templateName and layoutName should use the templates specified [DEPRECATED]', function() {
-  expect(2);
-  expectDeprecation(/Using deprecated `template` property on a Component/);
-
-  Ember.TEMPLATES.application = compile('<div id=\'wrapper\'>{{my-component}}</div>');
-  Ember.TEMPLATES['foo'] = compile('{{text}}');
-  Ember.TEMPLATES['bar'] = compile('{{text}}-{{yield}}');
-
-  boot(function() {
-    registry.register('controller:application', Ember.Controller.extend({
-      'text': 'outer'
-    }));
-
-    registry.register('component:my-component', Ember.Component.extend({
-      text: 'inner',
-      layoutName: 'bar',
-      templateName: 'foo'
+      layoutName: 'foo-bar-baz'
     }));
   });
 

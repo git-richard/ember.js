@@ -15,11 +15,10 @@ import { set } from 'ember-metal/property_set';
 import { isWatching } from 'ember-metal/watching';
 import {
   addObserver,
-  addBeforeObserver
+  _addBeforeObserver
 } from 'ember-metal/observer';
 
-var originalLookup = Ember.lookup;
-var obj, count, Global, lookup;
+var obj, count;
 
 QUnit.module('computed');
 
@@ -27,13 +26,35 @@ QUnit.test('computed property should be an instance of descriptor', function() {
   ok(computed(function() {}) instanceof Descriptor);
 });
 
-QUnit.test('defining computed property should invoke property on get', function() {
+QUnit.test('computed properties assert the presence of a getter or setter function', function() {
+  expectAssertion(function() {
+    computed('nogetternorsetter', {});
+  }, 'Computed properties must receive a getter or a setter, you passed none.');
+});
 
+QUnit.test('computed properties check for the presence of a function or configuration object', function() {
+  expectAssertion(function() {
+    computed('nolastargument');
+  }, 'Ember.computed expects a function or an object as last argument.');
+});
+
+QUnit.test('computed properties defined with an object only allow `get` and `set` keys', function() {
+  expectAssertion(function() {
+    computed({
+      get() {},
+      set() {},
+      other() {}
+    });
+  }, 'Config object pased to a Ember.computed can only contain `get` or `set` keys.');
+});
+
+
+QUnit.test('defining computed property should invoke property on get', function() {
   var obj = {};
   var count = 0;
   defineProperty(obj, 'foo', computed(function(key) {
     count++;
-    return 'computed '+key;
+    return 'computed ' + key;
   }));
 
   equal(get(obj, 'foo'), 'computed foo', 'should return value');
@@ -44,11 +65,11 @@ QUnit.test('defining computed property should invoke property on set', function(
   var obj = {};
   var count = 0;
   defineProperty(obj, 'foo', computed({
-    get: function(key) { return this['__'+key]; },
+    get: function(key) { return this['__' + key]; },
     set: function(key, value) {
       count++;
-      this['__'+key] = 'computed '+value;
-      return this['__'+key];
+      this['__' + key] = 'computed ' + value;
+      return this['__' + key];
     }
   }));
 
@@ -57,17 +78,27 @@ QUnit.test('defining computed property should invoke property on set', function(
   equal(get(obj, 'foo'), 'computed bar', 'should return new value');
 });
 
+QUnit.test('defining a computed property with a dependent key ending with @each is deprecated', function() {
+  expectAssertion(function() {
+    computed('blazo.@each', function() { });
+  }, `Depending on arrays using a dependent key ending with \`@each\` is no longer supported. Please refactor from \`Ember.computed('blazo.@each', function() {});\` to \`Ember.computed('blazo.[]', function() {})\`.`);
+
+  expectAssertion(function() {
+    computed('qux', 'zoopa.@each', function() { });
+  }, `Depending on arrays using a dependent key ending with \`@each\` is no longer supported. Please refactor from \`Ember.computed('zoopa.@each', function() {});\` to \`Ember.computed('zoopa.[]', function() {})\`.`);
+});
+
 var objA, objB;
 QUnit.module('computed should inherit through prototype', {
   setup() {
     objA = { __foo: 'FOO' };
     defineProperty(objA, 'foo', computed({
       get: function(key) {
-        return this['__'+key];
+        return this['__' + key];
       },
       set: function(key, value) {
-        this['__'+key] = 'computed '+value;
-        return this['__'+key];
+        this['__' + key] = 'computed ' + value;
+        return this['__' + key];
       }
     }));
 
@@ -102,11 +133,11 @@ QUnit.module('redefining computed property to normal', {
     objA = { __foo: 'FOO' };
     defineProperty(objA, 'foo', computed({
       get: function(key) {
-        return this['__'+key];
+        return this['__' + key];
       },
       set: function(key, value) {
-        this['__'+key] = 'computed '+value;
-        return this['__'+key];
+        this['__' + key] = 'computed ' + value;
+        return this['__' + key];
       }
     }));
 
@@ -141,21 +172,21 @@ QUnit.module('redefining computed property to another property', {
     objA = { __foo: 'FOO' };
     defineProperty(objA, 'foo', computed({
       get: function(key) {
-        return this['__'+key];
+        return this['__' + key];
       },
       set: function(key, value) {
-        this['__'+key] = 'A '+value;
-        return this['__'+key];
+        this['__' + key] = 'A ' + value;
+        return this['__' + key];
       }
     }));
 
     objB = Object.create(objA);
     objB.__foo = 'FOO';
     defineProperty(objB, 'foo', computed({
-      get: function(key) { return this['__'+key]; },
+      get: function(key) { return this['__' + key]; },
       set: function(key, value) {
-        this['__'+key] = 'B '+value;
-        return this['__'+key];
+        this['__' + key] = 'B ' + value;
+        return this['__' + key];
       }
     }));
   },
@@ -206,7 +237,7 @@ QUnit.module('computed - cacheable', {
     count = 0;
     var func = function(key, value) {
       count++;
-      return 'bar '+count;
+      return 'bar ' + count;
     };
     defineProperty(obj, 'foo', computed({ get: func, set: func }));
   },
@@ -254,7 +285,6 @@ testBoth('cacheFor should return the cached value', function(get, set) {
 });
 
 testBoth('cacheFor should return falsy cached values', function(get, set) {
-
   defineProperty(obj, 'falsy', computed(function() {
     return false;
   }));
@@ -302,7 +332,7 @@ QUnit.module('computed - dependentkey', {
     var getterAndSetter = function(key, value) {
       count++;
       get(this, 'bar');
-      return 'bar '+count;
+      return 'bar ' + count;
     };
     defineProperty(obj, 'foo', computed({
       get: getterAndSetter,
@@ -344,7 +374,7 @@ testBoth('should invalidate multiple nested dependent keys', function(get, set) 
   defineProperty(obj, 'bar', computed(function() {
     count++;
     get(this, 'baz');
-    return 'baz '+count;
+    return 'baz ' + count;
   }).property('baz'));
 
   equal(isWatching(obj, 'bar'), false, 'precond not watching dependent key');
@@ -367,13 +397,13 @@ testBoth('should invalidate multiple nested dependent keys', function(get, set) 
 testBoth('circular keys should not blow up', function(get, set) {
   var func = function(key, value) {
     count++;
-    return 'bar '+count;
+    return 'bar ' + count;
   };
   defineProperty(obj, 'bar', computed({ get: func, set: func }).property('foo'));
 
   defineProperty(obj, 'foo', computed(function(key) {
     count++;
-    return 'foo '+count;
+    return 'foo ' + count;
   }).property('bar'));
 
   equal(get(obj, 'foo'), 'foo 1', 'get once');
@@ -386,14 +416,13 @@ testBoth('circular keys should not blow up', function(get, set) {
 });
 
 testBoth('redefining a property should undo old dependent keys', function(get, set) {
-
   equal(isWatching(obj, 'bar'), false, 'precond not watching dependent key');
   equal(get(obj, 'foo'), 'bar 1');
   equal(isWatching(obj, 'bar'), true, 'lazily watching dependent key');
 
   defineProperty(obj, 'foo', computed(function() {
     count++;
-    return 'baz '+count;
+    return 'baz ' + count;
   }).property('baz'));
 
   equal(isWatching(obj, 'bar'), false, 'after redefining should not be watching dependent key');
@@ -410,7 +439,7 @@ testBoth('redefining a property should undo old dependent keys', function(get, s
 testBoth('can watch multiple dependent keys specified declaratively via brace expansion', function (get, set) {
   defineProperty(obj, 'foo', computed(function(key) {
     count++;
-    return 'foo '+count;
+    return 'foo ' + count;
   }).property('qux.{bar,baz}'));
 
   equal(get(obj, 'foo'), 'foo 1', 'get once');
@@ -447,9 +476,6 @@ testBoth('throws assertion if brace expansion notation has spaces', function (ge
 var func;
 var moduleOpts = {
   setup() {
-    originalLookup = Ember.lookup;
-    lookup = Ember.lookup = {};
-
     obj = {
       foo: {
         bar: {
@@ -460,35 +486,21 @@ var moduleOpts = {
       }
     };
 
-    Global = {
-      foo: {
-        bar: {
-          baz: {
-            biff: 'BIFF'
-          }
-        }
-      }
-    };
-
-    lookup['Global'] = Global;
-
     count = 0;
     func = function() {
       count++;
-      return get(obj, 'foo.bar.baz.biff')+' '+count;
+      return get(obj, 'foo.bar.baz.biff') + ' ' + count;
     };
   },
 
   teardown() {
-    obj = count = func = Global = null;
-    Ember.lookup = originalLookup;
+    obj = count = func = null;
   }
 };
 
 QUnit.module('computed - dependentkey with chained properties', moduleOpts);
 
 testBoth('depending on simple chain', function(get, set) {
-
   // assign computed property
   defineProperty(obj, 'prop',
     computed(func).property('foo.bar.baz.biff'));
@@ -530,55 +542,6 @@ testBoth('depending on simple chain', function(get, set) {
   set(obj, 'foo', { bar: { baz: { biff: 'BLARG' } } });
   equal(get(obj, 'prop'), 'NONE'); // should do nothing
   equal(count, 8, 'should be not have invoked computed again');
-
-});
-
-testBoth('depending on Global chain', function(get, set) {
-
-  // assign computed property
-  defineProperty(obj, 'prop', computed(function() {
-    count++;
-    return get('Global.foo.bar.baz.biff')+' '+count;
-  }).property('Global.foo.bar.baz.biff'));
-
-  equal(get(obj, 'prop'), 'BIFF 1');
-
-  set(get(Global, 'foo.bar.baz'), 'biff', 'BUZZ');
-  equal(get(obj, 'prop'), 'BUZZ 2');
-  equal(get(obj, 'prop'), 'BUZZ 2');
-
-  set(get(Global, 'foo.bar'), 'baz', { biff: 'BLOB' });
-  equal(get(obj, 'prop'), 'BLOB 3');
-  equal(get(obj, 'prop'), 'BLOB 3');
-
-  set(get(Global, 'foo.bar.baz'), 'biff', 'BUZZ');
-  equal(get(obj, 'prop'), 'BUZZ 4');
-  equal(get(obj, 'prop'), 'BUZZ 4');
-
-  set(get(Global, 'foo'), 'bar', { baz: { biff: 'BOOM' } });
-  equal(get(obj, 'prop'), 'BOOM 5');
-  equal(get(obj, 'prop'), 'BOOM 5');
-
-  set(get(Global, 'foo.bar.baz'), 'biff', 'BUZZ');
-  equal(get(obj, 'prop'), 'BUZZ 6');
-  equal(get(obj, 'prop'), 'BUZZ 6');
-
-  set(Global, 'foo', { bar: { baz: { biff: 'BLARG' } } });
-  equal(get(obj, 'prop'), 'BLARG 7');
-  equal(get(obj, 'prop'), 'BLARG 7');
-
-  set(get(Global, 'foo.bar.baz'), 'biff', 'BUZZ');
-  equal(get(obj, 'prop'), 'BUZZ 8');
-  equal(get(obj, 'prop'), 'BUZZ 8');
-
-  defineProperty(obj, 'prop');
-  set(obj, 'prop', 'NONE');
-  equal(get(obj, 'prop'), 'NONE');
-
-  set(Global, 'foo', { bar: { baz: { biff: 'BLARG' } } });
-  equal(get(obj, 'prop'), 'NONE'); // should do nothing
-  equal(count, 8, 'should be not have invoked computed again');
-
 });
 
 testBoth('chained dependent keys should evaluate computed properties lazily', function(get, set) {
@@ -606,7 +569,7 @@ QUnit.test('setter and getters are passed using an object', function() {
         equal(keyName, 'aInt', 'setter receives the keyName');
         equal(value, 123, 'setter receives the new value');
         equal(oldValue, 1, 'setter receives the old value');
-        this.set('a', ''+value); // side effect
+        this.set('a', '' + value); // side effect
         return parseInt(this.get('a'));
       }
     })
@@ -661,7 +624,6 @@ QUnit.test('the return value of the setter gets cached', function() {
 QUnit.module('computed edge cases');
 
 QUnit.test('adding a computed property should show up in key iteration', function() {
-
   var obj = {};
   defineProperty(obj, 'foo', computed(function() {}));
 
@@ -716,19 +678,19 @@ testBoth('setting a watched computed property', function(get, set) {
   var firstNameDidChange = 0;
   var lastNameWillChange = 0;
   var lastNameDidChange = 0;
-  addBeforeObserver(obj, 'fullName', function () {
+  _addBeforeObserver(obj, 'fullName', function () {
     fullNameWillChange++;
   });
   addObserver(obj, 'fullName', function () {
     fullNameDidChange++;
   });
-  addBeforeObserver(obj, 'firstName', function () {
+  _addBeforeObserver(obj, 'firstName', function () {
     firstNameWillChange++;
   });
   addObserver(obj, 'firstName', function () {
     firstNameDidChange++;
   });
-  addBeforeObserver(obj, 'lastName', function () {
+  _addBeforeObserver(obj, 'lastName', function () {
     lastNameWillChange++;
   });
   addObserver(obj, 'lastName', function () {
@@ -767,7 +729,7 @@ testBoth('setting a cached computed property that modifies the value you give it
   );
   var plusOneWillChange = 0;
   var plusOneDidChange = 0;
-  addBeforeObserver(obj, 'plusOne', function () {
+  _addBeforeObserver(obj, 'plusOne', function () {
     plusOneWillChange++;
   });
   addObserver(obj, 'plusOne', function () {

@@ -1,5 +1,4 @@
 import Ember from 'ember-metal/core';
-import isEnabled from 'ember-metal/features';
 import EmberView from 'ember-views/views/view';
 import run from 'ember-metal/run_loop';
 import compile from 'ember-template-compiler/system/compile';
@@ -17,10 +16,7 @@ function canSetFalsyMaxLength() {
   return input.maxLength === 0;
 }
 
-// jscs:disable validateIndentation
-if (isEnabled('ember-htmlbars-attribute-syntax')) {
-
-  QUnit.module('ember-htmlbars: property', {
+QUnit.module('ember-htmlbars: property', {
   teardown() {
     if (view) {
       run(view, view.destroy);
@@ -28,7 +24,7 @@ if (isEnabled('ember-htmlbars-attribute-syntax')) {
   }
 });
 
-  QUnit.test('maxlength sets the property and attribute', function() {
+QUnit.test('maxlength sets the property and attribute', function() {
   view = EmberView.create({
     context: { length: 5 },
     template: compile('<input maxlength={{length}}>')
@@ -41,7 +37,7 @@ if (isEnabled('ember-htmlbars-attribute-syntax')) {
   equal(view.element.firstChild.maxLength, 1);
 });
 
-  QUnit.test('quoted maxlength sets the property and attribute', function() {
+QUnit.test('quoted maxlength sets the attribute and is reflected as a property', function() {
   view = EmberView.create({
     context: { length: 5 },
     template: compile('<input maxlength=\'{{length}}\'>')
@@ -52,14 +48,14 @@ if (isEnabled('ember-htmlbars-attribute-syntax')) {
 
   if (canSetFalsyMaxLength()) {
     Ember.run(view, view.set, 'context.length', null);
-    equal(view.element.firstChild.maxLength, 0);
+    equal(view.element.firstChild.maxLength, document.createElement('input').maxLength);
   } else {
     Ember.run(view, view.set, 'context.length', 1);
     equal(view.element.firstChild.maxLength, 1);
   }
 });
 
-  QUnit.test('array value can be set as property', function() {
+QUnit.test('array value can be set as property', function() {
   view = EmberView.create({
     context: {},
     template: compile('<input value={{items}}>')
@@ -67,9 +63,6 @@ if (isEnabled('ember-htmlbars-attribute-syntax')) {
 
   appendView(view);
 
-  Ember.run(view, view.set, 'context.items', [4,5]);
+  Ember.run(view, view.set, 'context.items', [4, 5]);
   ok(true, 'no legacy assertion prohibited setting an array');
 });
-
-}
-// jscs:enable validateIndentation

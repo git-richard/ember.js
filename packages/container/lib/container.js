@@ -1,9 +1,6 @@
 import Ember from 'ember-metal/core'; // Ember.assert
 import dictionary from 'ember-metal/dictionary';
-
-// TODO - Temporary workaround for v0.4.0 of the ES6 transpiler, which lacks support for circular dependencies.
-// See the below usage of requireModule. Instead, it should be possible to simply `import Registry from './registry';`
-var Registry;
+import isEnabled from 'ember-metal/features';
 
 /**
  A container used to instantiate and cache objects.
@@ -19,33 +16,23 @@ var Registry;
  @class Container
  */
 function Container(registry, options) {
-  this._registry = registry || (function() {
-    Ember.deprecate('A container should only be created for an already instantiated registry. For backward compatibility, an isolated registry will be instantiated just for this container.');
-
-    // TODO - See note above about transpiler import workaround.
-    if (!Registry) { Registry = requireModule('container/registry')['default']; }
-
-    return new Registry();
-  }());
-
-  this.cache        = dictionary(options && options.cache ? options.cache : null);
-  this.factoryCache = dictionary(options && options.factoryCache ? options.factoryCache : null);
+  this.registry        = registry;
+  this.cache           = dictionary(options && options.cache ? options.cache : null);
+  this.factoryCache    = dictionary(options && options.factoryCache ? options.factoryCache : null);
   this.validationCache = dictionary(options && options.validationCache ? options.validationCache : null);
 }
 
 Container.prototype = {
   /**
    @private
-
-   @property _registry
+   @property registry
    @type Registry
    @since 1.11.0
    */
-  _registry: null,
+  registry: null,
 
   /**
    @private
-
    @property cache
    @type InheritingDict
    */
@@ -110,8 +97,8 @@ Container.prototype = {
    @return {any}
    */
   lookup(fullName, options) {
-    Ember.assert('fullName must be a proper full name', this._registry.validateFullName(fullName));
-    return lookup(this, this._registry.normalize(fullName), options);
+    Ember.assert('fullName must be a proper full name', this.registry.validateFullName(fullName));
+    return lookup(this, this.registry.normalize(fullName), options);
   },
 
   /**
@@ -123,8 +110,8 @@ Container.prototype = {
    @return {any}
    */
   lookupFactory(fullName) {
-    Ember.assert('fullName must be a proper full name', this._registry.validateFullName(fullName));
-    return factoryFor(this, this._registry.normalize(fullName));
+    Ember.assert('fullName must be a proper full name', this.registry.validateFullName(fullName));
+    return factoryFor(this, this.registry.normalize(fullName));
   },
 
   /**
@@ -153,39 +140,16 @@ Container.prototype = {
    */
   reset(fullName) {
     if (arguments.length > 0) {
-      resetMember(this, this._registry.normalize(fullName));
+      resetMember(this, this.registry.normalize(fullName));
     } else {
       resetCache(this);
     }
   }
 };
 
-(function exposeRegistryMethods() {
-  var methods = [
-    'register',
-    'unregister',
-    'resolve',
-    'normalize',
-    'typeInjection',
-    'injection',
-    'factoryInjection',
-    'factoryTypeInjection',
-    'has',
-    'options',
-    'optionsForType'
-  ];
-
-  function exposeRegistryMethod(method) {
-    Container.prototype[method] = function() {
-      Ember.deprecate(method + ' should be called on the registry instead of the container');
-      return this._registry[method].apply(this._registry, arguments);
-    };
-  }
-
-  for (var i = 0, l = methods.length; i < l; i++) {
-    exposeRegistryMethod(methods[i]);
-  }
-})();
+function isSingleton(container, fullName) {
+  return container.registry.getOption(fullName, 'singleton') !== false;
+}
 
 function lookup(container, fullName, options) {
   options = options || {};
@@ -198,11 +162,19 @@ function lookup(container, fullName, options) {
 
   if (value === undefined) { return; }
 
-  if (container._registry.getOption(fullName, 'singleton') !== false && options.singleton !== false) {
+  if (isSingleton(container, fullName) && options.singleton !== false) {
     container.cache[fullName] = value;
   }
 
   return value;
+}
+
+function markInjectionsAsDynamic(injections) {
+  injections._dynamic = true;
+}
+
+function areInjectionsDynamic(injections) {
+  return !!injections._dynamic;
 }
 
 function buildInjections(container) {
@@ -219,11 +191,14 @@ function buildInjections(container) {
       }
     }
 
-    container._registry.validateInjections(injections);
+    container.registry.validateInjections(injections);
 
     for (i = 0, l = injections.length; i < l; i++) {
       injection = injections[i];
       hash[injection.property] = lookup(container, injection.fullName);
+      if (!isSingleton(container, injection.fullName)) {
+        markInjectionsAsDynamic(hash);
+      }
     }
   }
 
@@ -235,7 +210,7 @@ function factoryFor(container, fullName) {
   if (cache[fullName]) {
     return cache[fullName];
   }
-  var registry = container._registry;
+  var registry = container.registry;
   var factory = registry.resolve(fullName);
   if (factory === undefined) { return; }
 
@@ -249,10 +224,10 @@ function factoryFor(container, fullName) {
     // for now just fallback to create time injection
     cache[fullName] = factory;
     return factory;
-
   } else {
     var injections = injectionsFor(container, fullName);
     var factoryInjections = factoryInjectionsFor(container, fullName);
+    var cacheable = !areInjectionsDynamic(injections) && !areInjectionsDynamic(factoryInjections);
 
     factoryInjections._toString = registry.makeToString(factory, fullName);
 
@@ -263,14 +238,16 @@ function factoryFor(container, fullName) {
       factory._onLookup(fullName);
     }
 
-    cache[fullName] = injectedFactory;
+    if (cacheable) {
+      cache[fullName] = injectedFactory;
+    }
 
     return injectedFactory;
   }
 }
 
 function injectionsFor(container, fullName) {
-  var registry = container._registry;
+  var registry = container.registry;
   var splitName = fullName.split(':');
   var type = splitName[0];
 
@@ -284,7 +261,7 @@ function injectionsFor(container, fullName) {
 }
 
 function factoryInjectionsFor(container, fullName) {
-  var registry = container._registry;
+  var registry = container.registry;
   var splitName = fullName.split(':');
   var type = splitName[0];
 
@@ -300,7 +277,7 @@ function instantiate(container, fullName) {
   var factory = factoryFor(container, fullName);
   var lazyInjections, validationCache;
 
-  if (container._registry.getOption(fullName, 'instantiate') === false) {
+  if (container.registry.getOption(fullName, 'instantiate') === false) {
     return factory;
   }
 
@@ -315,9 +292,9 @@ function instantiate(container, fullName) {
     // Ensure that all lazy injections are valid at instantiation time
     if (!validationCache[fullName] && typeof factory._lazyInjections === 'function') {
       lazyInjections = factory._lazyInjections();
-      lazyInjections = container._registry.normalizeInjectionsHash(lazyInjections);
+      lazyInjections = container.registry.normalizeInjectionsHash(lazyInjections);
 
-      container._registry.validateInjections(lazyInjections);
+      container.registry.validateInjections(lazyInjections);
     }
 
     validationCache[fullName] = true;
@@ -343,7 +320,7 @@ function eachDestroyable(container, callback) {
     key = keys[i];
     value = cache[key];
 
-    if (container._registry.getOption(key, 'instantiate') !== false) {
+    if (container.registry.getOption(key, 'instantiate') !== false) {
       callback(value);
     }
   }
@@ -371,6 +348,18 @@ function resetMember(container, fullName) {
       member.destroy();
     }
   }
+}
+
+// Once registry / container reform is enabled, we no longer need to expose
+// Container#_registry, since Container itself will be fully private.
+if (!isEnabled('ember-registry-container-reform')) {
+  Object.defineProperty(Container.prototype, '_registry', {
+    configurable: true,
+    enumerable: false,
+    get() {
+      return this.registry;
+    }
+  });
 }
 
 export default Container;

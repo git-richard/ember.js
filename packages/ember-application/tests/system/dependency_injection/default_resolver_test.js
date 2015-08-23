@@ -3,15 +3,13 @@ import run from 'ember-metal/run_loop';
 import Logger from 'ember-metal/logger';
 import Controller from 'ember-runtime/controllers/controller';
 import Route from 'ember-routing/system/route';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
 import View from 'ember-views/views/view';
 import Service from 'ember-runtime/system/service';
 import EmberObject from 'ember-runtime/system/object';
 import Namespace from 'ember-runtime/system/namespace';
 import Application from 'ember-application/system/application';
 import Helper, { helper as makeHelper } from 'ember-htmlbars/helper';
-import makeHandlebarsBoundHelper from 'ember-htmlbars/compat/make-bound-helper';
-import makeViewHelper from 'ember-htmlbars/system/make-view-helper';
 import makeHTMLBarsBoundHelper from 'ember-htmlbars/system/make_bound_helper';
 import {
   registerHelper
@@ -24,7 +22,7 @@ QUnit.module('Ember.Application Dependency Injection - default resolver', {
     originalLookup = Ember.lookup;
     application = run(Application, 'create');
 
-    registry = application.registry;
+    registry = application.__registry__;
     locator = application.__container__;
     originalLoggerInfo = Logger.info;
   },
@@ -123,31 +121,29 @@ QUnit.test('the default resolver resolves container-registered helpers', functio
 QUnit.test('the default resolver resolves helpers on the namespace', function() {
   let ShorthandHelper = makeHelper(function() {});
   let CompleteHelper = Helper.extend();
-  let LegacyBareFunctionHelper = function() {};
-  let LegacyHandlebarsBoundHelper = makeHandlebarsBoundHelper(function() {});
-  let LegacyHTMLBarsBoundHelper = makeHTMLBarsBoundHelper(function() {});
-  let ViewHelper = makeViewHelper(function() {});
+  let LegacyHTMLBarsBoundHelper;
+
+  expectDeprecation(function() {
+    LegacyHTMLBarsBoundHelper = makeHTMLBarsBoundHelper(function() {});
+  }, 'Using `Ember.HTMLBars.makeBoundHelper` is deprecated. Please refactor to using `Ember.Helper` or `Ember.Helper.helper`.');
 
   application.ShorthandHelper = ShorthandHelper;
   application.CompleteHelper = CompleteHelper;
-  application.LegacyBareFunctionHelper = LegacyBareFunctionHelper;
-  application.LegacyHandlebarsBoundHelper = LegacyHandlebarsBoundHelper;
   application.LegacyHtmlBarsBoundHelper = LegacyHTMLBarsBoundHelper; // Must use lowered "tml" in "HTMLBars" for resolver to find this
-  application.ViewHelper = ViewHelper;
 
   let resolvedShorthand = registry.resolve('helper:shorthand');
   let resolvedComplete = registry.resolve('helper:complete');
-  let resolvedLegacy = registry.resolve('helper:legacy-bare-function');
-  let resolvedLegacyHandlebars = registry.resolve('helper:legacy-handlebars-bound');
   let resolvedLegacyHTMLBars = registry.resolve('helper:legacy-html-bars-bound');
-  let resolvedView = registry.resolve('helper:view');
 
   equal(resolvedShorthand, ShorthandHelper, 'resolve fetches the shorthand helper factory');
   equal(resolvedComplete, CompleteHelper, 'resolve fetches the complete helper factory');
-  ok(typeof resolvedLegacy === 'function', 'legacy function helper is resolved');
-  equal(resolvedView, ViewHelper, 'resolves view helper');
   equal(resolvedLegacyHTMLBars, LegacyHTMLBarsBoundHelper, 'resolves legacy HTMLBars bound helper');
-  equal(resolvedLegacyHandlebars, LegacyHandlebarsBoundHelper, 'resolves legacy Handlebars bound helper');
+});
+
+QUnit.test('the default resolver resolves to the same instance no matter the notation ', function() {
+  application.NestedPostController = Controller.extend({});
+
+  equal(locator.lookup('controller:nested-post'), locator.lookup('controller:nested_post'), 'looks up NestedPost controller on application');
 });
 
 QUnit.test('the default resolver throws an error if the fullName to resolve is invalid', function() {
@@ -212,7 +208,6 @@ QUnit.test('lookup description', function() {
   equal(registry.describe('controller:foo'), 'App.FooController', 'Type gets appended at the end');
   equal(registry.describe('controller:foo.bar'), 'App.FooBarController', 'dots are removed');
   equal(registry.describe('model:foo'), 'App.Foo', 'models don\'t get appended at the end');
-
 });
 
 QUnit.test('assertion for routes without isRouteFactory property', function() {

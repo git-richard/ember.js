@@ -27,6 +27,7 @@ export default Service.extend({
   targetState: readOnly('router.targetState'),
   currentState: readOnly('router.currentState'),
   currentRouteName: readOnly('router.currentRouteName'),
+  currentPath: readOnly('router.currentPath'),
 
   availableRoutes() {
     return Object.keys(get(this, 'router').router.recognizer.names);
@@ -68,7 +69,7 @@ export default Service.extend({
     var router = get(this, 'router');
 
     var handlers = router.router.recognizer.handlersFor(routeName);
-    var leafName = handlers[handlers.length-1].handler;
+    var leafName = handlers[handlers.length - 1].handler;
     var maximumContexts = numberOfContextsAcceptedByHandler(routeName, handlers);
 
     // NOTE: any ugliness in the calculation of activeness is largely

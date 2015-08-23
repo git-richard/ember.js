@@ -1,5 +1,4 @@
 import {SuiteModuleBuilder} from 'ember-runtime/tests/suites/suite';
-import {fmt} from 'ember-runtime/system/string';
 
 var suite = SuiteModuleBuilder.create();
 
@@ -11,11 +10,9 @@ suite.test('should return index of object\'s last occurrence', function() {
   var len      = 3;
   var idx;
 
-  for (idx=0;idx<len;idx++) {
-    equal(obj.lastIndexOf(expected[idx]), idx,
-      fmt('obj.lastIndexOf(%@) should match idx', [expected[idx]]));
+  for (idx = 0;idx < len;idx++) {
+    equal(obj.lastIndexOf(expected[idx]), idx, `obj.lastIndexOf(${expected[idx]}) should match idx`);
   }
-
 });
 
 suite.test('should return index of object\'s last occurrence even startAt search location is equal to length', function() {
@@ -24,11 +21,9 @@ suite.test('should return index of object\'s last occurrence even startAt search
   var len      = 3;
   var idx;
 
-  for (idx=0;idx<len;idx++) {
-    equal(obj.lastIndexOf(expected[idx], len), idx,
-      fmt('obj.lastIndexOfs(%@) should match idx', [expected[idx]]));
+  for (idx = 0;idx < len;idx++) {
+    equal(obj.lastIndexOf(expected[idx], len), idx, `obj.lastIndexOfs(${expected[idx]}) should match idx`);
   }
-
 });
 
 suite.test('should return index of object\'s last occurrence even startAt search location is greater than length', function() {
@@ -37,11 +32,9 @@ suite.test('should return index of object\'s last occurrence even startAt search
   var len      = 3;
   var idx;
 
-  for (idx=0;idx<len;idx++) {
-    equal(obj.lastIndexOf(expected[idx], len + 1), idx,
-      fmt('obj.lastIndexOf(%@) should match idx', [expected[idx]]));
+  for (idx = 0;idx < len;idx++) {
+    equal(obj.lastIndexOf(expected[idx], len + 1), idx, `obj.lastIndexOf(${expected[idx]}) should match idx`);
   }
-
 });
 
 suite.test('should return -1 when no match is found', function() {

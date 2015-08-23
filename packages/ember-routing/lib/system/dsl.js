@@ -1,5 +1,4 @@
 import Ember from 'ember-metal/core'; // FEATURES, assert
-import isEnabled from 'ember-metal/features';
 
 /**
 @module ember
@@ -34,11 +33,15 @@ DSL.prototype = {
       })()
     );
 
-    if (isEnabled('ember-routing-named-substates')) {
-      if (this.enableLoadingSubstates) {
-        createRoute(this, `${name}_loading`, { resetNamespace: options.resetNamespace });
-        createRoute(this, `${name}_error`, { path: dummyErrorRoute });
-      }
+    Ember.warn(
+      `Using a route named 'select' (and defining a App.SelectView) will prevent you from using {{view 'select'}}`,
+      name !== 'select',
+      { id: 'ember-routing.dsl-select-route' }
+    );
+
+    if (this.enableLoadingSubstates) {
+      createRoute(this, `${name}_loading`, { resetNamespace: options.resetNamespace });
+      createRoute(this, `${name}_error`, { path: dummyErrorRoute });
     }
 
     if (callback) {
@@ -60,7 +63,7 @@ DSL.prototype = {
 
   push(url, name, callback) {
     var parts = name.split('.');
-    if (url === '' || url === '/' || parts[parts.length-1] === 'index') { this.explicitIndex = true; }
+    if (url === '' || url === '/' || parts[parts.length - 1] === 'index') { this.explicitIndex = true; }
 
     this.matches.push([url, name, callback]);
   },
@@ -76,7 +79,7 @@ DSL.prototype = {
     }
 
     options.resetNamespace = true;
-    Ember.deprecate('this.resource() is deprecated. Use this.route(\'name\', { resetNamespace: true }, function () {}) instead.');
+    Ember.deprecate('this.resource() is deprecated. Use this.route(\'name\', { resetNamespace: true }, function () {}) instead.', false, { id: 'ember-routing.router-resource', until: '3.0.0' });
     this.route(name, options, callback);
   },
 
@@ -88,7 +91,7 @@ DSL.prototype = {
     }
 
     return function(match) {
-      for (var i=0, l=dslMatches.length; i<l; i++) {
+      for (var i = 0, l = dslMatches.length; i < l; i++) {
         var dslMatch = dslMatches[i];
         match(dslMatch[0]).to(dslMatch[1], dslMatch[2]);
       }
@@ -125,4 +128,3 @@ DSL.map = function(callback) {
   callback.call(dsl);
   return dsl;
 };
-

@@ -23,7 +23,7 @@
 
 import Ember from 'ember-metal/core';
 import { guidFor } from 'ember-metal/utils';
-import { deprecateProperty } from 'ember-metal/deprecate_property';
+import EmptyObject from 'ember-metal/empty_object';
 
 function missingFunction(fn) {
   throw new TypeError(`${Object.prototype.toString.call(fn)} is not a function`);
@@ -34,10 +34,10 @@ function missingNew(name) {
 }
 
 function copyNull(obj) {
-  var output = Object.create(null);
+  var output = new EmptyObject();
 
   for (var prop in obj) {
-    // hasOwnPropery is not needed because obj is Object.create(null);
+    // hasOwnPropery is not needed because obj is new EmptyObject();
     output[prop] = obj[prop];
   }
 
@@ -66,7 +66,6 @@ function copyMap(original, newObject) {
   @private
 */
 function OrderedSet() {
-
   if (this instanceof OrderedSet) {
     this.clear();
     this._silenceRemoveDeprecation = false;
@@ -94,7 +93,7 @@ OrderedSet.prototype = {
     @private
   */
   clear() {
-    this.presenceSet = Object.create(null);
+    this.presenceSet = new EmptyObject();
     this.list = [];
     this.size = 0;
   },
@@ -117,21 +116,6 @@ OrderedSet.prototype = {
     }
 
     return this;
-  },
-
-  /**
-    @deprecated
-
-    @method remove
-    @param obj
-    @param _guid (optional and for internal use only)
-    @return {Boolean}
-    @private
-  */
-  remove(obj, _guid) {
-    Ember.deprecate('Calling `OrderedSet.prototype.remove` has been deprecated, please use `OrderedSet.prototype.delete` instead.', this._silenceRemoveDeprecation);
-
-    return this.delete(obj, _guid);
   },
 
   /**
@@ -239,8 +223,6 @@ OrderedSet.prototype = {
   }
 };
 
-deprecateProperty(OrderedSet.prototype, 'length', 'size');
-
 /**
   A Map stores values indexed by keys. Unlike JavaScript's
   default Objects, the keys of a Map can be any JavaScript
@@ -265,7 +247,7 @@ function Map() {
   if (this instanceof this.constructor) {
     this._keys = OrderedSet.create();
     this._keys._silenceRemoveDeprecation = true;
-    this._values = Object.create(null);
+    this._values = new EmptyObject();
     this.size = 0;
   } else {
     missingNew('OrderedSet');
@@ -340,21 +322,6 @@ Map.prototype = {
     this.size = keys.size;
 
     return this;
-  },
-
-  /**
-    @deprecated see delete
-    Removes a value from the map for an associated key.
-
-    @method remove
-    @param {*} key
-    @return {Boolean} true if an item was removed, false otherwise
-    @private
-  */
-  remove(key) {
-    Ember.deprecate('Calling `Map.prototype.remove` has been deprecated, please use `Map.prototype.delete` instead.');
-
-    return this.delete(key);
   },
 
   /**
@@ -439,7 +406,7 @@ Map.prototype = {
   */
   clear() {
     this._keys.clear();
-    this._values = Object.create(null);
+    this._values = new EmptyObject();
     this.size = 0;
   },
 
@@ -452,8 +419,6 @@ Map.prototype = {
     return copyMap(this, new Map());
   }
 };
-
-deprecateProperty(Map.prototype, 'length', 'size');
 
 /**
   @class MapWithDefault

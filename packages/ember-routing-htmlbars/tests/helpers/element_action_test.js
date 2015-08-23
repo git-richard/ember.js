@@ -1,33 +1,33 @@
 import Ember from 'ember-metal/core'; // A, FEATURES, assert
-import isEnabled from 'ember-metal/features';
 import { set } from 'ember-metal/property_set';
 import run from 'ember-metal/run_loop';
 import EventDispatcher from 'ember-views/system/event_dispatcher';
 import ActionManager from 'ember-views/system/action_manager';
 
-import { Registry } from 'ember-runtime/system/container';
 import EmberObject from 'ember-runtime/system/object';
 import EmberController from 'ember-runtime/controllers/controller';
-import EmberArrayController, { arrayControllerDeprecation } from 'ember-runtime/controllers/array_controller';
 
 import compile from 'ember-template-compiler/system/compile';
 import EmberView from 'ember-views/views/view';
-import EmberComponent from 'ember-views/views/component';
+import EmberComponent from 'ember-views/components/component';
 import jQuery from 'ember-views/system/jquery';
 
 import { ActionHelper } from 'ember-routing-htmlbars/keywords/element-action';
-import { deprecation as eachDeprecation } from 'ember-htmlbars/helpers/each';
+
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
 
 import {
   runAppend,
   runDestroy
 } from 'ember-runtime/tests/utils';
 
-var dispatcher, view;
+var dispatcher, view, originalViewKeyword;
 var originalRegisterAction = ActionHelper.registerAction;
 
 QUnit.module('ember-routing-htmlbars: action helper', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     dispatcher = EventDispatcher.create();
     dispatcher.setup();
   },
@@ -35,6 +35,7 @@ QUnit.module('ember-routing-htmlbars: action helper', {
   teardown() {
     runDestroy(view);
     runDestroy(dispatcher);
+    resetKeyword('view', originalViewKeyword);
 
     ActionHelper.registerAction = originalRegisterAction;
   }
@@ -129,108 +130,6 @@ QUnit.test('Inside a yield, the target points at the original target', function(
   });
 
   equal(watted, true, 'The action was called on the right context');
-});
-
-QUnit.test('should target the current controller inside an {{each}} loop [DEPRECATED]', function() {
-  expectDeprecation(arrayControllerDeprecation);
-  var registeredTarget;
-
-  ActionHelper.registerAction = function({ node }) {
-    registeredTarget = node.state.target;
-  };
-
-  var itemController = EmberController.create();
-
-  var ArrayController = EmberArrayController.extend({
-    itemController: 'stub',
-    controllerAt(idx, object) {
-      return itemController;
-    }
-  });
-
-  var controller = ArrayController.create({
-    model: Ember.A([1])
-  });
-
-  view = EmberView.create({
-    controller: controller,
-    template: compile('{{#each controller}}<button {{action "editTodo"}}>Edit</button>{{/each}}')
-  });
-
-  expectDeprecation(function() {
-    runAppend(view);
-  }, eachDeprecation);
-
-  equal(registeredTarget, itemController, 'the item controller is the target of action');
-});
-
-QUnit.test('should target the with-controller inside an {{#with controller=\'person\'}} [DEPRECATED]', function() {
-  var registeredTarget;
-
-  ActionHelper.registerAction = function({ node }) {
-    registeredTarget = node.state.target;
-  };
-
-  var PersonController = EmberController.extend();
-  var registry = new Registry();
-  var container = registry.container();
-  var parentController = EmberObject.create({
-    container: container
-  });
-
-  view = EmberView.create({
-    container: container,
-    template: compile('{{#with view.person controller="person"}}<div {{action "editTodo"}}></div>{{/with}}'),
-    person: EmberObject.create(),
-    controller: parentController
-  });
-
-  registry.register('controller:person', PersonController);
-
-  expectDeprecation(function() {
-    runAppend(view);
-  }, 'Using the context switching form of `{{with}}` is deprecated. Please use the block param form (`{{#with bar as |foo|}}`) instead.');
-
-  ok(registeredTarget instanceof PersonController, 'the with-controller is the target of action');
-});
-
-QUnit.skip('should target the with-controller inside an {{each}} in a {{#with controller=\'person\'}} [DEPRECATED]', function() {
-  expectDeprecation(eachDeprecation);
-  expectDeprecation('Using the context switching form of `{{with}}` is deprecated. Please use the keyword form (`{{with foo as bar}}`) instead.');
-  expectDeprecation(arrayControllerDeprecation);
-
-  var eventsCalled = [];
-
-  var PeopleController = EmberArrayController.extend({
-    actions: {
-      robert() { eventsCalled.push('robert'); },
-      brian() { eventsCalled.push('brian'); }
-    }
-  });
-
-  var registry = new Registry();
-  var container = registry.container();
-  var parentController = EmberObject.create({
-    container: container,
-    people: Ember.A([
-      { name: 'robert' },
-      { name: 'brian' }
-    ])
-  });
-
-  view = EmberView.create({
-    container: container,
-    template: compile('{{#with people controller="people"}}{{#each}}<a href="#" {{action name}}>{{name}}</a>{{/each}}{{/with}}'),
-    controller: parentController
-  });
-
-  registry.register('controller:people', PeopleController);
-
-  runAppend(view);
-
-  view.$('a').trigger('click');
-
-  deepEqual(eventsCalled, ['robert', 'brian'], 'the events are fired properly');
 });
 
 QUnit.test('should allow a target to be specified', function() {
@@ -477,28 +376,6 @@ QUnit.test('should work properly in a {{#with foo as |bar|}} block', function() 
   });
 
   runAppend(view);
-
-  view.$('a').trigger('click');
-
-  ok(eventHandlerWasCalled, 'The event handler was called');
-});
-
-QUnit.test('should work properly in a #with block [DEPRECATED]', function() {
-  var eventHandlerWasCalled = false;
-
-  var controller = EmberController.extend({
-    actions: { edit() { eventHandlerWasCalled = true; } }
-  }).create();
-
-  view = EmberView.create({
-    controller: controller,
-    something: { ohai: 'there' },
-    template: compile('{{#with view.something}}<a href="#" {{action "edit"}}>click me</a>{{/with}}')
-  });
-
-  expectDeprecation(function() {
-    runAppend(view);
-  }, 'Using the context switching form of `{{with}}` is deprecated. Please use the block param form (`{{#with bar as |foo|}}`) instead.');
 
   view.$('a').trigger('click');
 
@@ -803,10 +680,10 @@ QUnit.test('it does not trigger action with special clicks', function() {
     event[prop] = value;
     view.$('a').trigger(event);
     if (expected) {
-      ok(showCalled, 'should call action with '+prop+':'+value);
+      ok(showCalled, 'should call action with ' + prop + ':' + value);
       ok(event.isDefaultPrevented(), 'should prevent default');
     } else {
-      ok(!showCalled, 'should not call action with '+prop+':'+value);
+      ok(!showCalled, 'should not call action with ' + prop + ':' + value);
       ok(!event.isDefaultPrevented(), 'should not prevent default');
     }
   }
@@ -900,73 +777,20 @@ QUnit.test('a quoteless parameter should allow dynamic lookup of the actionName'
 });
 
 QUnit.test('a quoteless parameter should lookup actionName in context [DEPRECATED]', function() {
-  expect(5);
-  var lastAction;
-  var actionOrder = [];
-
-  ignoreDeprecation(function() {
-    view = EmberView.create({
-      template: compile('{{#each allactions}}<a {{bind-attr id=\'name\'}} {{action name}}>{{title}}</a>{{/each}}')
-    });
-  });
-
-  var controller = EmberController.extend({
-    allactions: Ember.A([{ title: 'Biggity Boom',name: 'biggityBoom' },
-                         { title: 'Whomp Whomp',name: 'whompWhomp' },
-                         { title: 'Sloopy Dookie',name: 'sloopyDookie' }]),
-    actions: {
-      biggityBoom() {
-        lastAction = 'biggityBoom';
-        actionOrder.push(lastAction);
-      },
-      whompWhomp() {
-        lastAction = 'whompWhomp';
-        actionOrder.push(lastAction);
-      },
-      sloopyDookie() {
-        lastAction = 'sloopyDookie';
-        actionOrder.push(lastAction);
-      }
-    }
-  }).create();
-
-  expectDeprecation(function() {
-    run(function() {
-      view.set('controller', controller);
-      view.appendTo('#qunit-fixture');
-    });
-  }, eachDeprecation);
-
-  var testBoundAction = function(propertyValue) {
-    run(function() {
-      view.$('#'+propertyValue).click();
-    });
-
-    equal(lastAction, propertyValue, 'lastAction set to ' + propertyValue);
-  };
-
-  testBoundAction('whompWhomp');
-  testBoundAction('sloopyDookie');
-  testBoundAction('biggityBoom');
-
-  deepEqual(actionOrder, ['whompWhomp', 'sloopyDookie', 'biggityBoom'], 'action name was looked up properly');
-});
-
-QUnit.test('a quoteless string parameter should resolve actionName, including path', function() {
   expect(4);
   var lastAction;
   var actionOrder = [];
 
   ignoreDeprecation(function() {
     view = EmberView.create({
-      template: compile('{{#each item in allactions}}<a {{bind-attr id=\'item.name\'}} {{action item.name}}>{{item.title}}</a>{{/each}}')
+      template: compile('{{#each allactions as |allacation|}}<a id="{{allacation.name}}" {{action allacation.name}}>{{allacation.title}}</a>{{/each}}')
     });
   });
 
   var controller = EmberController.extend({
-    allactions: Ember.A([{ title: 'Biggity Boom',name: 'biggityBoom' },
-                         { title: 'Whomp Whomp',name: 'whompWhomp' },
-                         { title: 'Sloopy Dookie',name: 'sloopyDookie' }]),
+    allactions: Ember.A([{ title: 'Biggity Boom', name: 'biggityBoom' },
+                         { title: 'Whomp Whomp', name: 'whompWhomp' },
+                         { title: 'Sloopy Dookie', name: 'sloopyDookie' }]),
     actions: {
       biggityBoom() {
         lastAction = 'biggityBoom';
@@ -990,7 +814,7 @@ QUnit.test('a quoteless string parameter should resolve actionName, including pa
 
   var testBoundAction = function(propertyValue) {
     run(function() {
-      view.$('#'+propertyValue).click();
+      view.$('#' + propertyValue).click();
     });
 
     equal(lastAction, propertyValue, 'lastAction set to ' + propertyValue);
@@ -1003,38 +827,82 @@ QUnit.test('a quoteless string parameter should resolve actionName, including pa
   deepEqual(actionOrder, ['whompWhomp', 'sloopyDookie', 'biggityBoom'], 'action name was looked up properly');
 });
 
-if (isEnabled('ember-routing-htmlbars-improved-actions')) {
+QUnit.test('a quoteless string parameter should resolve actionName, including path', function() {
+  expect(4);
+  var lastAction;
+  var actionOrder = [];
 
-  QUnit.test('a quoteless function parameter should be called, including arguments', function() {
-    expect(2);
-
-    var arg = 'rough ray';
-
-    view = EmberView.create({
-      template: compile(`<a {{action submit '${arg}'}}></a>`)
-    });
-
-    var controller = EmberController.extend({
-      submit(actualArg) {
-        ok(true, 'submit function called');
-        equal(actualArg, arg, 'argument passed');
-      }
-    }).create();
-
-    run(function() {
-      view.set('controller', controller);
-      view.appendTo('#qunit-fixture');
-    });
-
-    run(function() {
-      view.$('a').click();
-    });
+  view = EmberView.create({
+    template: compile('{{#each allactions as |item|}}<a id="{{item.name}}" {{action item.name}}>{{item.title}}</a>{{/each}}')
   });
 
-}
+  var controller = EmberController.extend({
+    allactions: Ember.A([{ title: 'Biggity Boom', name: 'biggityBoom' },
+                         { title: 'Whomp Whomp', name: 'whompWhomp' },
+                         { title: 'Sloopy Dookie', name: 'sloopyDookie' }]),
+    actions: {
+      biggityBoom() {
+        lastAction = 'biggityBoom';
+        actionOrder.push(lastAction);
+      },
+      whompWhomp() {
+        lastAction = 'whompWhomp';
+        actionOrder.push(lastAction);
+      },
+      sloopyDookie() {
+        lastAction = 'sloopyDookie';
+        actionOrder.push(lastAction);
+      }
+    }
+  }).create();
+
+  run(function() {
+    view.set('controller', controller);
+    view.appendTo('#qunit-fixture');
+  });
+
+  var testBoundAction = function(propertyValue) {
+    run(function() {
+      view.$('#' + propertyValue).click();
+    });
+
+    equal(lastAction, propertyValue, 'lastAction set to ' + propertyValue);
+  };
+
+  testBoundAction('whompWhomp');
+  testBoundAction('sloopyDookie');
+  testBoundAction('biggityBoom');
+
+  deepEqual(actionOrder, ['whompWhomp', 'sloopyDookie', 'biggityBoom'], 'action name was looked up properly');
+});
+
+QUnit.test('a quoteless function parameter should be called, including arguments', function() {
+  expect(2);
+
+  var arg = 'rough ray';
+
+  view = EmberView.create({
+    template: compile(`<a {{action submit '${arg}'}}></a>`)
+  });
+
+  var controller = EmberController.extend({
+    submit(actualArg) {
+      ok(true, 'submit function called');
+      equal(actualArg, arg, 'argument passed');
+    }
+  }).create();
+
+  run(function() {
+    view.set('controller', controller);
+    view.appendTo('#qunit-fixture');
+  });
+
+  run(function() {
+    view.$('a').click();
+  });
+});
 
 QUnit.test('a quoteless parameter that does not resolve to a value asserts', function() {
-
   var controller = EmberController.extend({
     actions: {
       ohNoeNotValid() {}

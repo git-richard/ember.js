@@ -45,6 +45,11 @@ export function onerrorDefault(e) {
     error = e;
   }
 
+  if (error && error.name === "UnrecognizedURLError") {
+    Ember.assert("The URL '" + error.message + "' did not match any routes in your application", false);
+    return;
+  }
+
   if (error && error.name !== 'TransitionAborted') {
     if (Ember.testing) {
       // ES6TODO: remove when possible
@@ -66,6 +71,11 @@ export function onerrorDefault(e) {
   }
 }
 
+export function after (cb) {
+  Ember.run.schedule(Ember.run.queues[Ember.run.queues.length - 1], cb);
+}
+
 RSVP.on('error', onerrorDefault);
+RSVP.configure('after', after);
 
 export default RSVP;

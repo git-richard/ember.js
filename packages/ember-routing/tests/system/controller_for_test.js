@@ -7,8 +7,6 @@ import Registry from 'container/registry';
 import Namespace from 'ember-runtime/system/namespace';
 import { classify } from 'ember-runtime/system/string';
 import Controller from 'ember-runtime/controllers/controller';
-import ObjectController from 'ember-runtime/controllers/object_controller';
-import ArrayController, { arrayControllerDeprecation } from 'ember-runtime/controllers/array_controller';
 import controllerFor from 'ember-routing/system/controller_for';
 import generateController from 'ember-routing/system/generate_controller';
 import {
@@ -26,8 +24,6 @@ var buildContainer = function(namespace) {
   registry.register('application:main', namespace, { instantiate: false });
 
   registry.register('controller:basic', Controller, { instantiate: false });
-  registry.register('controller:object', ObjectController, { instantiate: false });
-  registry.register('controller:array', ArrayController, { instantiate: false });
 
   return container;
 };
@@ -54,7 +50,7 @@ QUnit.module('Ember.controllerFor', {
   setup() {
     namespace = Namespace.create();
     container = buildContainer(namespace);
-    container._registry.register('controller:app', Controller.extend());
+    container.registry.register('controller:app', Controller.extend());
     appController = container.lookup('controller:app');
   },
   teardown() {
@@ -95,20 +91,6 @@ QUnit.test('generateController should create Ember.Controller', function() {
   ok(controller instanceof Controller, 'should create controller');
 });
 
-QUnit.test('generateController should create Ember.ObjectController [DEPRECATED]', function() {
-  var context = {};
-  var controller = generateController(container, 'home', context);
-
-  ok(controller instanceof ObjectController, 'should create controller');
-});
-
-QUnit.test('generateController should create Ember.ArrayController', function() {
-  expectDeprecation(arrayControllerDeprecation);
-  var context = Ember.A();
-  var controller = generateController(container, 'home', context);
-
-  ok(controller instanceof ArrayController, 'should create controller');
-});
 
 QUnit.test('generateController should create App.Controller if provided', function() {
   var controller;
@@ -117,27 +99,4 @@ QUnit.test('generateController should create App.Controller if provided', functi
   controller = generateController(container, 'home');
 
   ok(controller instanceof namespace.Controller, 'should create controller');
-});
-
-QUnit.test('generateController should create App.ObjectController if provided', function() {
-  var context = {};
-  var controller;
-  namespace.ObjectController = ObjectController.extend();
-
-  controller = generateController(container, 'home', context);
-
-  ok(controller instanceof namespace.ObjectController, 'should create controller');
-
-});
-
-QUnit.test('generateController should create App.ArrayController if provided', function() {
-  expectDeprecation(arrayControllerDeprecation);
-  var context = Ember.A();
-  var controller;
-  namespace.ArrayController = ArrayController.extend();
-
-  controller = generateController(container, 'home', context);
-
-  ok(controller instanceof namespace.ArrayController, 'should create controller');
-
 });

@@ -2,16 +2,23 @@ import Ember from 'ember-metal/core';
 import { computed } from 'ember-metal/computed';
 import run from 'ember-metal/run_loop';
 import jQuery from 'ember-views/system/jquery';
-import EmberView from 'ember-views/views/view';
+import EmberView, { DeprecatedView } from 'ember-views/views/view';
 import { compile } from 'ember-template-compiler';
 
-var view;
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
+var view, originalViewKeyword;
 
 QUnit.module('Ember.View', {
+  setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
+  },
   teardown() {
     run(function() {
       view.destroy();
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -151,4 +158,19 @@ QUnit.test('propagates dependent-key invalidated bindings upstream', function() 
   run(() => childView.set('dependencyProp', 'new-value'));
   equal(childView.get('childProp'), 'new-value', 'pre-cond - new value is propagated to CP');
   equal(view.get('parentProp'), 'new-value', 'new value is propagated across template');
+});
+
+QUnit.module('DeprecatedView');
+
+QUnit.test('calling reopen on DeprecatedView delegates to View', function() {
+  expect(2);
+  var originalReopen = EmberView.reopen;
+  var obj = {};
+
+  EmberView.reopen = function(arg) { ok(arg === obj); };
+
+  expectNoDeprecation();
+  DeprecatedView.reopen(obj);
+
+  EmberView.reopen = originalReopen;
 });

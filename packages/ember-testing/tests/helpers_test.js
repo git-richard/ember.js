@@ -15,8 +15,12 @@ import EmberRoute from 'ember-routing/system/route';
 import EmberApplication from 'ember-application/system/application';
 import compile from 'ember-template-compiler/system/compile';
 
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
 var App;
 var originalAdapter = Test.adapter;
+var originalViewKeyword;
 
 function cleanup() {
   // Teardown setupForTesting
@@ -95,16 +99,27 @@ QUnit.module('ember-testing: Helper setup', {
   teardown() { cleanup(); }
 });
 
+function registerHelper() {
+  Test.registerHelper('LeakyMcLeakLeak', function(app) {
+  });
+}
+
 QUnit.test('Ember.Application#injectTestHelpers/#removeTestHelpers', function() {
   App = run(EmberApplication, EmberApplication.create);
   assertNoHelpers(App);
 
+  registerHelper();
+
   App.injectTestHelpers();
   assertHelpers(App);
+  ok(Ember.Test.Promise.prototype.LeakyMcLeakLeak, 'helper in question SHOULD be present');
 
   App.removeTestHelpers();
   assertNoHelpers(App);
+
+  equal(Ember.Test.Promise.prototype.LeakyMcLeakLeak, undefined, 'should NOT leak test promise extensions');
 });
+
 
 QUnit.test('Ember.Application#setupForTesting', function() {
   run(function() {
@@ -244,22 +259,24 @@ QUnit.test('Ember.Application#removeTestHelpers resets the helperContainer\'s or
 
 QUnit.module('ember-testing: Helper methods', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     setupApp();
   },
   teardown() {
     cleanup();
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
 QUnit.test('`wait` respects registerWaiters', function() {
   expect(3);
 
-  var counter=0;
+  var counter = 0;
   function waiter() {
     return ++counter > 2;
   }
 
-  var other=0;
+  var other = 0;
   function otherWaiter() {
     return ++other > 2;
   }
@@ -314,7 +331,6 @@ QUnit.test('`wait` helper can be passed a resolution value', function() {
   }).then(function(val) {
     equal(val, 'promise', 'can resolve to a promise resolution value');
   });
-
 });
 
 QUnit.test('`click` triggers appropriate events in order', function() {
@@ -417,7 +433,7 @@ QUnit.test('`wait` respects registerWaiters with optional context', function() {
     }
   };
 
-  var other=0;
+  var other = 0;
   function otherWaiter() {
     return ++other > 2;
   }
@@ -579,6 +595,39 @@ QUnit.test('`fillIn` focuses on the element', function() {
   fillIn('#first', 'current value');
   andThen(function() {
     equal(find('#first').val(), 'current value');
+  });
+});
+
+QUnit.test('`fillIn` fires `input` and `change` events in the proper order', function() {
+  expect(1);
+
+  var fillIn, visit, andThen;
+  var events = [];
+  App.IndexController = Ember.Controller.extend({
+    actions: {
+      oninputHandler(e) {
+        events.push(e.type);
+      },
+      onchangeHanlders(e) {
+        events.push(e.type);
+      }
+    }
+  });
+
+  App.IndexView = EmberView.extend({
+    template: compile('<input type="text" id="first" oninput={{action "oninputHandler"}} onchange={{action "onchangeHanlders"}}>')
+  });
+
+  run(App, App.advanceReadiness);
+
+  fillIn = App.testHelpers.fillIn;
+  visit = App.testHelpers.visit;
+  andThen = App.testHelpers.andThen;
+
+  visit('/');
+  fillIn('#first', 'current value');
+  andThen(function() {
+    deepEqual(events, ['input', 'change'], '`input` and `change` events are fired in the proper order');
   });
 });
 

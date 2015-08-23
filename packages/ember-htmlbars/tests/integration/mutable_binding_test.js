@@ -4,7 +4,8 @@ import Registry from 'container/registry';
 //import jQuery from "ember-views/system/jquery";
 import compile from 'ember-template-compiler/system/compile';
 import ComponentLookup from 'ember-views/component_lookup';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
+import GlimmerComponent from 'ember-htmlbars/glimmer-component';
 import { runAppend, runDestroy } from 'ember-runtime/tests/utils';
 import run from 'ember-metal/run_loop';
 import { computed } from 'ember-metal/computed';
@@ -342,11 +343,10 @@ QUnit.test('automatic mutable bindings to constant non-streams tolerate attempts
 
 // jscs:disable validateIndentation
 if (isEnabled('ember-htmlbars-component-generation')) {
-
-  QUnit.test('mutable bindings work as angle-bracket component attributes', function(assert) {
+QUnit.test('mutable bindings work as angle-bracket component attributes', function(assert) {
   var middle;
 
-  registry.register('component:middle-mut', Component.extend({
+  registry.register('component:middle-mut', GlimmerComponent.extend({
     // no longer mutable
     layout: compile('<bottom-mut setMe={{attrs.value}} />'),
 
@@ -355,7 +355,7 @@ if (isEnabled('ember-htmlbars-component-generation')) {
     }
   }));
 
-  registry.register('component:bottom-mut', Component.extend({
+  registry.register('component:bottom-mut', GlimmerComponent.extend({
     layout: compile('<p class="bottom">{{attrs.setMe}}</p>')
   }));
 
@@ -376,10 +376,10 @@ if (isEnabled('ember-htmlbars-component-generation')) {
   assert.strictEqual(view.get('val'), 13, 'the set propagated back up');
 });
 
-  QUnit.test('a simple mutable binding using `mut` can be converted into an immutable binding with angle-bracket components', function(assert) {
+QUnit.test('a simple mutable binding using `mut` can be converted into an immutable binding with angle-bracket components', function(assert) {
   var middle, bottom;
 
-  registry.register('component:middle-mut', Component.extend({
+  registry.register('component:middle-mut', GlimmerComponent.extend({
     // no longer mutable
     layout: compile('<bottom-mut setMe={{attrs.value}} />'),
 
@@ -388,7 +388,7 @@ if (isEnabled('ember-htmlbars-component-generation')) {
     }
   }));
 
-  registry.register('component:bottom-mut', Component.extend({
+  registry.register('component:bottom-mut', GlimmerComponent.extend({
     layout: compile('<p class="bottom">{{attrs.setMe}}</p>'),
 
     didInsertElement() {
@@ -413,6 +413,5 @@ if (isEnabled('ember-htmlbars-component-generation')) {
   assert.strictEqual(view.$('p.bottom').text(), '13');
   assert.strictEqual(view.get('val'), 13, 'the set propagated back up');
 });
-
 }
 // jscs:enable validateIndentation

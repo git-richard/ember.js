@@ -8,7 +8,6 @@ import View from 'ember-views/views/view';
 import { MUTABLE_CELL } from 'ember-views/compat/attrs-proxy';
 import getCellOrValue from 'ember-htmlbars/hooks/get-cell-or-value';
 import { instrument } from 'ember-htmlbars/system/instrumentation-support';
-import { handleLegacyRender } from 'ember-htmlbars/node-managers/component-node-manager';
 
 // In theory this should come through the env, but it should
 // be safe to import this until we make the hook system public
@@ -59,14 +58,6 @@ ViewNodeManager.create = function(renderNode, env, attrs, found, parentView, pat
     let layout = get(component, 'layout');
     if (layout) {
       componentInfo.layout = layout;
-      if (!contentTemplate) {
-        let template = getTemplate(component);
-
-        if (template) {
-          Ember.deprecate('Using deprecated `template` property on a ' + (component.isView ? 'View' : 'Component') + '.');
-          contentTemplate = template.raw;
-        }
-      }
     } else {
       componentInfo.layout = getTemplate(component) || componentInfo.layout;
     }
@@ -89,15 +80,12 @@ ViewNodeManager.prototype.render = function(env, attrs, visitor) {
   var component = this.component;
 
   return instrument(component, function() {
-
     var newEnv = env;
     if (component) {
       newEnv = env.childWithView(component);
     }
 
     if (component) {
-      var snapshot = takeSnapshot(attrs);
-      env.renderer.setAttrs(this.component, snapshot);
       env.renderer.willRender(component);
       env.renderedViews.push(component.elementId);
     }
@@ -108,14 +96,16 @@ ViewNodeManager.prototype.render = function(env, attrs, visitor) {
 
     if (component) {
       var element = this.expectElement && this.renderNode.firstNode;
-      handleLegacyRender(component, element);
 
-      env.renderer.didCreateElement(component, element); // 2.0TODO: Remove legacy hooks.
-      env.renderer.willInsertElement(component, element);
-      env.lifecycleHooks.push({ type: 'didInsertElement', view: component });
+      // In environments like FastBoot, disable any hooks that would cause the component
+      // to access the DOM directly.
+      if (env.destinedForDOM) {
+        env.renderer.didCreateElement(component, element);
+        env.renderer.willInsertElement(component, element);
+        env.lifecycleHooks.push({ type: 'didInsertElement', view: component });
+      }
     }
   }, this);
-
 };
 
 ViewNodeManager.prototype.rerender = function(env, attrs, visitor) {
@@ -132,7 +122,7 @@ ViewNodeManager.prototype.rerender = function(env, attrs, visitor) {
       env.renderer.willUpdate(component, snapshot);
 
       if (component._renderNode.shouldReceiveAttrs) {
-        env.renderer.updateAttrs(component, snapshot);
+        env.renderer.componentUpdateAttrs(component, snapshot);
         setProperties(component, mergeBindings({}, shadowedAttrs(component, snapshot)));
         component._renderNode.shouldReceiveAttrs = false;
       }
@@ -157,7 +147,11 @@ ViewNodeManager.prototype.destroy = function() {
 };
 
 function getTemplate(componentOrView) {
-  return componentOrView.isComponent ? get(componentOrView, '_template') : get(componentOrView, 'template');
+  if (!componentOrView.isComponent) {
+    return get(componentOrView, 'template');
+  }
+
+  return null;
 }
 
 export function createOrUpdateComponent(component, options, createOptions, renderNode, env, attrs = {}) {
@@ -165,6 +159,10 @@ export function createOrUpdateComponent(component, options, createOptions, rende
   let props = merge({}, options);
   let defaultController = View.proto().controller;
   let hasSuppliedController = 'controller' in attrs || 'controller' in props;
+
+  if (!props.ownerView && options.parentView) {
+    props.ownerView = options.parentView.ownerView;
+  }
 
   props.attrs = snapshot;
   if (component.create) {
@@ -185,6 +183,7 @@ export function createOrUpdateComponent(component, options, createOptions, rende
 
     component = component.create(props);
   } else {
+    env.renderer.componentUpdateAttrs(component, snapshot);
     mergeBindings(props, shadowedAttrs(component, snapshot));
     setProperties(component, props);
   }
@@ -238,7 +237,7 @@ function mergeBindings(target, attrs) {
     // set `"blah"` to the root of the target because
     // that would replace all attrs with `attrs.attrs`
     if (prop === 'attrs') {
-      Ember.warn(`Invoking a component with a hash attribute named \`attrs\` is not supported. Please refactor usage of ${target} to avoid passing \`attrs\` as a hash parameter.`);
+      Ember.warn(`Invoking a component with a hash attribute named \`attrs\` is not supported. Please refactor usage of ${target} to avoid passing \`attrs\` as a hash parameter.`, false, { id: 'ember-htmlbars.view-unsupported-attrs' });
       continue;
     }
     let value = attrs[prop];

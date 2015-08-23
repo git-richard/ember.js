@@ -1,5 +1,4 @@
 import {SuiteModuleBuilder} from 'ember-runtime/tests/suites/suite';
-import {fmt} from 'ember-runtime/system/string';
 
 var suite = SuiteModuleBuilder.create();
 
@@ -11,10 +10,9 @@ suite.test('should return index of object', function() {
   var len      = 3;
   var idx;
 
-  for (idx=0;idx<len;idx++) {
-    equal(obj.indexOf(expected[idx]), idx, fmt('obj.indexOf(%@) should match idx', [expected[idx]]));
+  for (idx = 0;idx < len;idx++) {
+    equal(obj.indexOf(expected[idx]), idx, `obj.indexOf(${expected[idx]}) should match idx`);
   }
-
 });
 
 suite.test('should return -1 when requesting object not in index', function() {

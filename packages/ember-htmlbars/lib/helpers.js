@@ -7,7 +7,9 @@
  @private
  @property helpers
 */
-var helpers = Object.create(null);
+import EmptyObject from 'ember-metal/empty_object';
+
+var helpers = new EmptyObject();
 
 /**
 @module ember

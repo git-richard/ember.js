@@ -38,7 +38,7 @@ Libraries.prototype = {
       }
       this._registry.splice(index, 0, { name: name, version: version });
     } else {
-      Ember.warn(`Library "${name}" is already registered with Ember.`);
+      Ember.warn(`Library "${name}" is already registered with Ember.`, false, { id: 'ember-metal.libraries-register' });
     }
   },
 
@@ -54,13 +54,6 @@ Libraries.prototype = {
       index = this._registry.indexOf(lib);
       this._registry.splice(index, 1);
     }
-  },
-
-  each(callback) {
-    Ember.deprecate('Using Ember.libraries.each() is deprecated. Access to a list of registered libraries is currently a private API. If you are not knowingly accessing this method, your out-of-date Ember Inspector may be doing so.');
-    this._registry.forEach((lib) => {
-      callback(lib.name, lib.version);
-    });
   }
 };
 

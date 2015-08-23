@@ -2,22 +2,14 @@ import Registry from 'container/registry';
 import run from 'ember-metal/run_loop';
 import ComponentLookup from 'ember-views/component_lookup';
 import View from 'ember-views/views/view';
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
 import compile from 'ember-template-compiler/system/compile';
-import helpers from 'ember-htmlbars/helpers';
-import { registerHelper } from 'ember-htmlbars/helpers';
 import { runAppend, runDestroy } from 'ember-runtime/tests/utils';
 
 var registry, container, view;
 
-function aliasHelper(params, hash, options) {
-  this.yield(params);
-}
-
 QUnit.module('ember-htmlbars: block params', {
   setup() {
-    registerHelper('alias', aliasHelper);
-
     registry = new Registry();
     container = registry.container();
     registry.optionsForType('component', { singleton: false });
@@ -27,11 +19,8 @@ QUnit.module('ember-htmlbars: block params', {
   },
 
   teardown() {
-    delete helpers.alias;
-
-    runDestroy(container);
     runDestroy(view);
-
+    runDestroy(container);
     registry = container = view = null;
   }
 });
@@ -45,13 +34,12 @@ QUnit.test('should raise error if helper not available', function() {
   expectAssertion(function() {
     runAppend(view);
   }, `A helper named 'shouldfail' could not be found`);
-
 });
 
 QUnit.test('basic block params usage', function() {
   view = View.create({
     committer: { name: 'rwjblue' },
-    template: compile('{{#alias view.committer.name as |name|}}name: {{name}}, length: {{name.length}}{{/alias}}')
+    template: compile('{{#with view.committer.name as |name|}}name: {{name}}, length: {{name.length}}{{/with}}')
   });
 
   runAppend(view);
@@ -72,21 +60,21 @@ QUnit.test('nested block params shadow correctly', function() {
     committer2: { name: 'machty' },
     template: compile(
       '{{name}}' +
-      '{{#alias view.committer1.name as |name|}}' +
+      '{{#with view.committer1.name as |name|}}' +
         '[{{name}}' +
-        '{{#alias view.committer2.name as |name|}}' +
+        '{{#with view.committer2.name as |name|}}' +
           '[{{name}}]' +
-        '{{/alias}}' +
+        '{{/with}}' +
         '{{name}}]' +
-      '{{/alias}}' +
+      '{{/with}}' +
       '{{name}}' +
-      '{{#alias view.committer2.name as |name|}}' +
+      '{{#with view.committer2.name as |name|}}' +
         '[{{name}}' +
-        '{{#alias view.committer1.name as |name|}}' +
+        '{{#with view.committer1.name as |name|}}' +
           '[{{name}}]' +
-        '{{/alias}}' +
+        '{{/with}}' +
         '{{name}}]' +
-      '{{/alias}}' +
+      '{{/with}}' +
       '{{name}}'
     )
   });

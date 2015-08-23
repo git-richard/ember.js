@@ -13,7 +13,13 @@ import { isArray } from 'ember-runtime/utils';
 
 function reduceMacro(dependentKey, callback, initialValue) {
   return computed(`${dependentKey}.[]`, function() {
-    return get(this, dependentKey).reduce(callback, initialValue);
+    const arr = get(this, dependentKey);
+
+    if (arr === null || typeof arr !== 'object') { return initialValue; }
+
+    return arr.reduce((previousValue, currentValue, index, array) => {
+      return callback.call(this, previousValue, currentValue, index, array);
+    }, initialValue);
   }).readOnly();
 }
 
@@ -30,7 +36,7 @@ function arrayMacro(dependentKey, callback) {
   return computed(dependentKey, function() {
     var value = get(this, propertyName);
     if (isArray(value)) {
-      return Ember.A(callback(value));
+      return Ember.A(callback.call(this, value));
     } else {
       return Ember.A();
     }
@@ -173,7 +179,9 @@ export function min(dependentKey) {
   @public
 */
 export function map(dependentKey, callback) {
-  return arrayMacro(dependentKey, value => value.map(callback));
+  return arrayMacro(dependentKey, function(value) {
+    return value.map(callback, this);
+  });
 }
 
 /**
@@ -251,7 +259,9 @@ export function mapBy(dependentKey, propertyKey) {
   @public
 */
 export function filter(dependentKey, callback) {
-  return arrayMacro(dependentKey, value => value.filter(callback));
+  return arrayMacro(dependentKey, function(value) {
+    return value.filter(callback, this);
+  });
 }
 
 /**
@@ -538,7 +548,9 @@ export function sort(itemsKey, sortDefinition) {
 }
 
 function customSort(itemsKey, comparator) {
-  return arrayMacro(itemsKey, value => value.slice().sort(comparator));
+  return arrayMacro(itemsKey, function(value) {
+    return value.slice().sort((x, y) => comparator.call(this, x, y));
+  });
 }
 
 // This one needs to dynamically set up and tear down observers on the itemsKey
@@ -578,7 +590,6 @@ function propertySort(itemsKey, sortPropertiesKey) {
     });
 
     return Ember.A(items.slice().sort((itemA, itemB) => {
-
       for (var i = 0; i < normalizedSort.length; ++i) {
         var [prop, direction] = normalizedSort[i];
         var result = compare(get(itemA, prop), get(itemB, prop));

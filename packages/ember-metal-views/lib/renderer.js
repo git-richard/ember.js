@@ -1,12 +1,23 @@
 import run from 'ember-metal/run_loop';
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
-import { assign } from 'ember-metal/merge';
+import assign from 'ember-metal/assign';
 import setProperties from 'ember-metal/set_properties';
 import buildComponentTemplate from 'ember-views/system/build-component-template';
+import environment from 'ember-metal/environment';
 
-function Renderer(_helper) {
-  this._dom = _helper;
+function Renderer(domHelper, destinedForDOM) {
+  this._dom = domHelper;
+
+  // This flag indicates whether the resulting rendered element will be
+  // inserted into the DOM. This should be set to `false` if the rendered
+  // element is going to be serialized to HTML without being inserted into
+  // the DOM (e.g., in FastBoot mode). By default, this flag is the same
+  // as whether we are running in an environment with DOM, but may be
+  // overridden.
+  this._destinedForDOM = destinedForDOM === undefined ?
+    environment.hasDOM :
+    destinedForDOM;
 }
 
 Renderer.prototype.prerenderTopLevelView =
@@ -18,7 +29,7 @@ Renderer.prototype.prerenderTopLevelView =
     view._renderNode = renderNode;
 
     var layout = get(view, 'layout');
-    var template = view.isComponent ? get(view, '_template') : get(view, 'template');
+    var template = get(view, 'template');
 
     var componentInfo = { component: view, layout: layout };
 
@@ -63,7 +74,7 @@ Renderer.prototype.dispatchLifecycleHooks =
     var lifecycleHooks = env.lifecycleHooks;
     var i, hook;
 
-    for (i=0; i<lifecycleHooks.length; i++) {
+    for (i = 0; i < lifecycleHooks.length; i++) {
       hook = lifecycleHooks[i];
       ownerView._dispatching = hook.type;
 
@@ -136,7 +147,8 @@ Renderer.prototype.setAttrs = function (view, attrs) {
 }; // set attrs the first time
 
 Renderer.prototype.componentInitAttrs = function (component, attrs) {
-  set(component, 'attrs', attrs);
+  // for attrs-proxy support
+  component.trigger('_internalDidReceiveAttrs');
   component.trigger('didInitAttrs', { attrs });
   component.trigger('didReceiveAttrs', { newAttrs: attrs });
 }; // set attrs the first time
@@ -171,6 +183,8 @@ Renderer.prototype.componentUpdateAttrs = function (component, newAttrs) {
     set(component, 'attrs', newAttrs);
   }
 
+  // for attrs-proxy support
+  component.trigger('_internalDidReceiveAttrs');
   component.trigger('didUpdateAttrs', { oldAttrs, newAttrs });
   component.trigger('didReceiveAttrs', { oldAttrs, newAttrs });
 };

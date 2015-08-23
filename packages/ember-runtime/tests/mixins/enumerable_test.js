@@ -58,7 +58,7 @@ EnumerableTests.extend({
 
   // allows for testing of the basic enumerable after an internal mutation
   mutate(obj) {
-    obj.addObject(obj._content.length+1);
+    obj.addObject(obj._content.length + 1);
   },
 
   toArray(obj) {
@@ -125,7 +125,7 @@ QUnit.test('any', function() {
 });
 
 QUnit.test('any with NaN', function() {
-  var numbers = Ember.A([1,2,NaN,4]);
+  var numbers = Ember.A([1, 2, NaN, 4]);
 
   var hasNaN = numbers.any(function(n) {
     return isNaN(n);
@@ -183,7 +183,6 @@ var obj, observer;
 QUnit.module('mixins/enumerable/enumerableContentDidChange');
 
 QUnit.test('should notify observers of []', function() {
-
   var obj = EmberObject.extend(Enumerable, {
     nextObject() {}, // avoid exceptions
 
@@ -198,7 +197,6 @@ QUnit.test('should notify observers of []', function() {
   obj.enumerableContentWillChange();
   obj.enumerableContentDidChange();
   equal(obj._count, 1, 'should have invoked');
-
 });
 
 // ..........................................................

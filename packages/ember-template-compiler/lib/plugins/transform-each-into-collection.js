@@ -18,7 +18,9 @@ TransformEachIntoCollection.prototype.transform = function TransformEachIntoColl
     let moduleInfo = calculateLocationDisplay(moduleName, legacyHashKey.loc);
 
     Ember.deprecate(
-      `Using '${legacyHashKey.key}' with '{{each}}' ${moduleInfo}is deprecated.  Please refactor to a component.`
+      `Using '${legacyHashKey.key}' with '{{each}}' ${moduleInfo}is deprecated.  Please refactor to a component.`,
+      false,
+      { id: 'ember-template-compiler.transform-each-into-collection', until: '2.0.0' }
     );
 
     let list = node.params.shift();
@@ -39,9 +41,7 @@ TransformEachIntoCollection.prototype.transform = function TransformEachIntoColl
 };
 
 function validate(node) {
-  if ((node.type === 'BlockStatement' || node.type === 'MustacheStatement') &&
-      node.path.original === 'each') {
-
+  if ((node.type === 'BlockStatement' || node.type === 'MustacheStatement') && node.path.original === 'each') {
     return any(node.hash.pairs, pair => {
       let key = pair.key;
       return key === 'itemController' ||
@@ -57,7 +57,7 @@ function validate(node) {
 }
 
 function any(list, predicate) {
-  for (var i=0, l=list.length; i<l; i++) {
+  for (var i = 0, l = list.length; i < l; i++) {
     if (predicate(list[i])) { return list[i]; }
   }
 

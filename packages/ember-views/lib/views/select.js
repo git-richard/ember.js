@@ -3,7 +3,6 @@
 @submodule ember-views
 */
 
-import Ember from 'ember-metal/core';
 import replace from 'ember-metal/replace';
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
@@ -474,7 +473,7 @@ var Select = View.extend({
   */
   groupView: SelectOptgroup,
 
-  groupedContent: computed('optionGroupPath', 'content.@each', function() {
+  groupedContent: computed('optionGroupPath', 'content.[]', function() {
     var groupPath = get(this, 'optionGroupPath');
     var groupedContent = emberA();
     var content = get(this, 'content') || [];
@@ -513,7 +512,7 @@ var Select = View.extend({
     }
   },
 
-  selectionDidChange: observer('selection.@each', function() {
+  selectionDidChange: observer('selection.[]', function() {
     var selection = get(this, 'selection');
     if (get(this, 'multiple')) {
       if (!isArray(selection)) {
@@ -669,14 +668,6 @@ var Select = View.extend({
   }
 });
 
-var DeprecatedSelect = Select.extend({
-  init() {
-    this._super(...arguments);
-    Ember.deprecate(`Ember.Select is deprecated. Consult the Deprecations Guide for a migration strategy.`, !!Ember.ENV._ENABLE_LEGACY_VIEW_SUPPORT, { url: 'http://emberjs.com/deprecations/v1.x/#toc_ember-select' });
-  }
-});
-
-
 function indexesOf(iterable, elements) {
   return elements === undefined ? [] : elements.map((item) => iterable.indexOf(item));
 }
@@ -684,7 +675,6 @@ function indexesOf(iterable, elements) {
 export default Select;
 export {
   Select,
-  DeprecatedSelect,
   SelectOption,
   SelectOptgroup
 };

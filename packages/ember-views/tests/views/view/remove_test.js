@@ -4,13 +4,19 @@ import jQuery from 'ember-views/system/jquery';
 import View from 'ember-views/views/view';
 import ContainerView from 'ember-views/views/container_view';
 
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
+
+
 // .......................................................
 // removeChild()
 //
 
 var parentView, child;
+var originalViewKeyword;
 QUnit.module('View#removeChild', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     expectDeprecation('Setting `childViews` on a Container is deprecated.');
 
     parentView = ContainerView.create({ childViews: [View] });
@@ -21,6 +27,7 @@ QUnit.module('View#removeChild', {
       parentView.destroy();
       child.destroy();
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -31,7 +38,7 @@ QUnit.test('returns receiver', function() {
 QUnit.test('removes child from parent.childViews array', function() {
   ok(get(parentView, 'childViews').indexOf(child)>=0, 'precond - has child in childViews array before remove');
   parentView.removeChild(child);
-  ok(get(parentView, 'childViews').indexOf(child)<0, 'removed child');
+  ok(get(parentView, 'childViews').indexOf(child) < 0, 'removed child');
 });
 
 QUnit.test('sets parentView property to null', function() {
@@ -46,6 +53,7 @@ QUnit.test('sets parentView property to null', function() {
 var view, childViews;
 QUnit.module('View#removeAllChildren', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     expectDeprecation('Setting `childViews` on a Container is deprecated.');
 
     view = ContainerView.create({
@@ -58,6 +66,7 @@ QUnit.module('View#removeAllChildren', {
       childViews.forEach(function(v) { v.destroy(); });
       view.destroy();
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -76,12 +85,16 @@ QUnit.test('returns receiver', function() {
 // removeFromParent()
 //
 QUnit.module('View#removeFromParent', {
+  setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
+  },
   teardown() {
     run(function() {
       if (parentView) { parentView.destroy(); }
       if (child) { child.destroy(); }
       if (view) { view.destroy(); }
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -103,7 +116,7 @@ QUnit.test('removes view from parent view', function() {
   });
 
   ok(!get(child, 'parentView'), 'no longer has parentView');
-  ok(get(parentView, 'childViews').indexOf(child)<0, 'no longer in parent childViews');
+  ok(get(parentView, 'childViews').indexOf(child) < 0, 'no longer in parent childViews');
   equal(parentView.$('div').length, 0, 'removes DOM element from parent');
 });
 
@@ -142,7 +155,7 @@ QUnit.test('the DOM element is gone after doing append and remove in two separat
     view.remove();
   });
 
-  var viewElem = jQuery('#'+get(view, 'elementId'));
+  var viewElem = jQuery('#' + get(view, 'elementId'));
   ok(viewElem.length === 0, 'view\'s element doesn\'t exist in DOM');
 });
 
@@ -153,7 +166,7 @@ QUnit.test('the DOM element is gone after doing append and remove in a single ru
     view.remove();
   });
 
-  var viewElem = jQuery('#'+get(view, 'elementId'));
+  var viewElem = jQuery('#' + get(view, 'elementId'));
   ok(viewElem.length === 0, 'view\'s element doesn\'t exist in DOM');
 });
 

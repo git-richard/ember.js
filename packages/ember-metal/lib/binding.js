@@ -313,31 +313,7 @@ mixinProperties(Binding, {
   to(to) {
     var C = this;
     return new C(to, undefined);
-  },
-
-  /**
-    Creates a new Binding instance and makes it apply in a single direction.
-    A one-way binding will relay changes on the `from` side object (supplied
-    as the `from` argument) the `to` side, but not the other way around.
-    This means that if you change the "to" side directly, the "from" side may have
-    a different value.
-
-    See `Binding.oneWay`.
-
-    @method oneWay
-    @param {String} from from path.
-    @param {Boolean} [flag] (Optional) passing nothing here will make the
-      binding `oneWay`. You can instead pass `false` to disable `oneWay`, making the
-      binding two way again.
-    @return {Ember.Binding} `this`
-    @public
-  */
-  oneWay(from, flag) {
-    Ember.deprecate('Ember.oneWay has been deprecated. Please use Ember.computed.oneWay instead.', false);
-    var C = this;
-    return new C(undefined, from).oneWay(flag);
   }
-
 });
 /**
   An `Ember.Binding` connects the properties of two objects so that whenever
@@ -488,21 +464,6 @@ mixinProperties(Binding, {
 */
 export function bind(obj, to, from) {
   return new Binding(to, from).connect(obj);
-}
-
-/**
-  @method oneWay
-  @for Ember
-  @param {Object} obj The root object of the transform.
-  @param {String} to The path to the 'to' side of the binding.
-    Must be relative to obj.
-  @param {String} from The path to the 'from' side of the binding.
-    Must be relative to obj or a global path.
-  @return {Ember.Binding} binding instance
-  @public
-*/
-export function oneWay(obj, to, from) {
-  return new Binding(to, from).oneWay().connect(obj);
 }
 
 export {

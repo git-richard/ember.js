@@ -3,7 +3,7 @@
 @submodule ember-views
 */
 import Ember from 'ember-metal/core';
-import { Mixin } from 'ember-metal/mixin';
+import { Mixin, observer } from 'ember-metal/mixin';
 import { get } from 'ember-metal/property_get';
 
 /**
@@ -69,7 +69,8 @@ var LegacyViewSupport = Mixin.create({
     @private
   */
   nearestChildOf(klass) {
-    Ember.deprecate('nearestChildOf has been deprecated.');
+    Ember.deprecate('nearestChildOf has been deprecated.', false,
+                   { id: 'ember-views.nearest-child-of', until: '3.0.0' });
 
     var view = get(this, 'parentView');
 
@@ -90,14 +91,28 @@ var LegacyViewSupport = Mixin.create({
     @private
   */
   nearestInstanceOf(klass) {
-    Ember.deprecate('nearestInstanceOf is deprecated and will be removed from future releases. Use nearestOfType.');
+    Ember.deprecate('nearestInstanceOf is deprecated and will be removed from future releases. Use nearestOfType.',
+                    false,
+                    { id: 'ember-views.nearest-instance-of', until: '3.0.0' });
     var view = get(this, 'parentView');
 
     while (view) {
       if (view instanceof klass) { return view; }
       view = get(view, 'parentView');
     }
-  }
+  },
+
+  /**
+    If a value that affects template rendering changes, the view should be
+    re-rendered to reflect the new value.
+
+    @method _contextDidChange
+    @private
+    @private
+  */
+  _contextDidChange: observer('context', function() {
+    this.rerender();
+  })
 });
 
 export default LegacyViewSupport;

@@ -22,12 +22,13 @@ var SPLIT_REGEX = /\{|\}/;
   Ember.expandProperties('{foo,bar}', echo);            //=> 'foo', 'bar'
   Ember.expandProperties('foo.{bar,baz}', echo);        //=> 'foo.bar', 'foo.baz'
   Ember.expandProperties('{foo,bar}.baz', echo);        //=> 'foo.baz', 'bar.baz'
-  Ember.expandProperties('foo.{bar,baz}.@each', echo)   //=> 'foo.bar.@each', 'foo.baz.@each'
+  Ember.expandProperties('foo.{bar,baz}.[]', echo)      //=> 'foo.bar.[]', 'foo.baz.[]'
   Ember.expandProperties('{foo,bar}.{spam,eggs}', echo) //=> 'foo.spam', 'foo.eggs', 'bar.spam', 'bar.eggs'
   Ember.expandProperties('{foo}.bar.{baz}')             //=> 'foo.bar.baz'
   ```
 
-  @method
+  @method expandProperties
+  @for Ember
   @private
   @param {String} pattern The property pattern to expand.
   @param {Function} callback The callback to invoke.  It is invoked once per

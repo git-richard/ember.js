@@ -9,14 +9,13 @@ import Ember from 'ember-metal'; // Ember.deprecate, Ember.assert, Ember.librari
 import isEnabled from 'ember-metal/features';
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
+import EmptyObject from 'ember-metal/empty_object';
 import { runLoadHooks } from 'ember-runtime/system/lazy_load';
 import Namespace from 'ember-runtime/system/namespace';
 import DefaultResolver from 'ember-application/system/resolver';
 import run from 'ember-metal/run_loop';
 import { canInvoke } from 'ember-metal/utils';
 import Controller from 'ember-runtime/controllers/controller';
-import ObjectController from 'ember-runtime/controllers/object_controller';
-import ArrayController from 'ember-runtime/controllers/array_controller';
 import Renderer from 'ember-metal-views/renderer';
 import DOMHelper from 'ember-htmlbars/system/dom-helper';
 import SelectView from 'ember-views/views/select';
@@ -39,7 +38,8 @@ import LegacyEachView from 'ember-views/views/legacy_each_view';
 import LinkToComponent from 'ember-routing-views/views/link';
 import RoutingService from 'ember-routing/services/routing';
 import ContainerDebugAdapter from 'ember-extension-support/container_debug_adapter';
-
+import { _loaded } from 'ember-runtime/system/lazy_load';
+import RegistryProxy, { buildFakeRegistryWithDeprecations } from 'ember-runtime/mixins/registry_proxy';
 import environment from 'ember-metal/environment';
 
 function props(obj) {
@@ -123,6 +123,20 @@ var librariesRegistered = false;
   });
   ```
 
+  To prevent Ember from setting up a listener for a default event,
+  specify the event name with a `null` value in the `customEvents`
+  property:
+
+  ```javascript
+  var App = Ember.Application.create({
+    customEvents: {
+      // prevent listeners for mouseenter/mouseleave events
+      mouseenter: null,
+      mouseleave: null
+    }
+  });
+  ```
+
   By default, the application sets up these event listeners on the document
   body. However, in cases where you are embedding an Ember application inside
   an existing page, you may want it to set up the listeners on an element
@@ -154,7 +168,7 @@ var librariesRegistered = false;
   Ember.Application.initializer({
     name: 'api-adapter',
 
-    initialize: function(container, application) {
+    initialize: function(application) {
       application.register('api-adapter:main', ApiAdapter);
     }
   });
@@ -196,7 +210,7 @@ var librariesRegistered = false;
   @public
 */
 
-var Application = Namespace.extend({
+var Application = Namespace.extend(RegistryProxy, {
   _suppressDeferredDeprecation: true,
 
   /**
@@ -243,7 +257,11 @@ var Application = Namespace.extend({
     If you would like additional bubbling events to be delegated to your
     views, set your `Ember.Application`'s `customEvents` property
     to a hash containing the DOM event name as the key and the
-    corresponding view method name as the value. For example:
+    corresponding view method name as the value. Setting an event to
+    a value of `null` will prevent a default event listener from being
+    added for that event.
+
+    To add new events to be listened to:
 
     ```javascript
     var App = Ember.Application.create({
@@ -254,6 +272,17 @@ var Application = Namespace.extend({
     });
     ```
 
+    To prevent default events from being listened to:
+
+    ```javascript
+    var App = Ember.Application.create({
+      customEvents: {
+        // remove support for mouseenter / mouseleave events
+        mouseenter: null,
+        mouseleave: null
+      }
+    });
+    ```
     @property customEvents
     @type Object
     @default null
@@ -316,7 +345,7 @@ var Application = Namespace.extend({
     @return {Ember.Registry} the configured registry
   */
   buildRegistry() {
-    var registry = this.registry = Application.buildRegistry(this);
+    var registry = this.__registry__ = Application.buildRegistry(this);
 
     return registry;
   },
@@ -330,9 +359,7 @@ var Application = Namespace.extend({
   */
   buildInstance() {
     return ApplicationInstance.create({
-      customEvents: get(this, 'customEvents'),
-      rootElement: get(this, 'rootElement'),
-      applicationRegistry: this.registry
+      application: this
     });
   },
 
@@ -341,13 +368,13 @@ var Application = Namespace.extend({
 
     // For the default instance only, set the view registry to the global
     // Ember.View.views hash for backwards-compatibility.
-    EmberView.views = instance.container.lookup('-view-registry:main');
+    EmberView.views = instance.lookup('-view-registry:main');
 
     // TODO2.0: Legacy support for App.__container__
     // and global methods on App that rely on a single,
     // default instance.
     this.__deprecatedInstance__ = instance;
-    this.__container__ = instance.container;
+    this.__container__ = instance.__container__;
 
     return instance;
   },
@@ -427,123 +454,6 @@ var Application = Namespace.extend({
   },
 
   /**
-    Registers a factory that can be used for dependency injection (with
-    `App.inject`) or for service lookup. Each factory is registered with
-    a full name including two parts: `type:name`.
-
-    A simple example:
-
-    ```javascript
-    var App = Ember.Application.create();
-
-    App.Orange = Ember.Object.extend();
-    App.register('fruit:favorite', App.Orange);
-    ```
-
-    Ember will resolve factories from the `App` namespace automatically.
-    For example `App.CarsController` will be discovered and returned if
-    an application requests `controller:cars`.
-
-    An example of registering a controller with a non-standard name:
-
-    ```javascript
-    var App = Ember.Application.create();
-    var Session = Ember.Controller.extend();
-
-    App.register('controller:session', Session);
-
-    // The Session controller can now be treated like a normal controller,
-    // despite its non-standard name.
-    App.ApplicationController = Ember.Controller.extend({
-      needs: ['session']
-    });
-    ```
-
-    Registered factories are **instantiated** by having `create`
-    called on them. Additionally they are **singletons**, each time
-    they are looked up they return the same instance.
-
-    Some examples modifying that default behavior:
-
-    ```javascript
-    var App = Ember.Application.create();
-
-    App.Person = Ember.Object.extend();
-    App.Orange = Ember.Object.extend();
-    App.Email = Ember.Object.extend();
-    App.session = Ember.Object.create();
-
-    App.register('model:user', App.Person, { singleton: false });
-    App.register('fruit:favorite', App.Orange);
-    App.register('communication:main', App.Email, { singleton: false });
-    App.register('session', App.session, { instantiate: false });
-    ```
-
-    @method register
-    @param  fullName {String} type:name (e.g., 'model:user')
-    @param  factory {Function} (e.g., App.Person)
-    @param  options {Object} (optional) disable instantiation or singleton usage
-    @public
-  **/
-  register() {
-    this.registry.register(...arguments);
-  },
-
-  /**
-    Define a dependency injection onto a specific factory or all factories
-    of a type.
-
-    When Ember instantiates a controller, view, or other framework component
-    it can attach a dependency to that component. This is often used to
-    provide services to a set of framework components.
-
-    An example of providing a session object to all controllers:
-
-    ```javascript
-    var App = Ember.Application.create();
-    var Session = Ember.Object.extend({ isAuthenticated: false });
-
-    // A factory must be registered before it can be injected
-    App.register('session:main', Session);
-
-    // Inject 'session:main' onto all factories of the type 'controller'
-    // with the name 'session'
-    App.inject('controller', 'session', 'session:main');
-
-    App.IndexController = Ember.Controller.extend({
-      isLoggedIn: Ember.computed.alias('session.isAuthenticated')
-    });
-    ```
-
-    Injections can also be performed on specific factories.
-
-    ```javascript
-    App.inject(<full_name or type>, <property name>, <full_name>)
-    App.inject('route', 'source', 'source:main')
-    App.inject('route:application', 'email', 'model:email')
-    ```
-
-    It is important to note that injections can only be performed on
-    classes that are instantiated by Ember itself. Instantiating a class
-    directly (via `create` or `new`) bypasses the dependency injection
-    system.
-
-    **Note:** Ember-Data instantiates its models in a unique manner, and consequently
-    injections onto models (or all models) will not work as expected. Injections
-    on models can be enabled by setting `Ember.MODEL_FACTORY_INJECTIONS`
-    to `true`.
-
-    @method inject
-    @param  factoryNameOrType {String}
-    @param  property {String}
-    @param  injectionName {String}
-    @public
-  **/
-  inject() {
-    this.registry.injection(...arguments);
-  },
-
-  /**
     Calling initialize manually is not supported.
 
     Please see Ember.Application#advanceReadiness and
@@ -582,7 +492,7 @@ var Application = Namespace.extend({
     this._bootPromise = defer.promise;
     this._bootResolver = defer;
 
-    this.runInitializers(this.registry);
+    this.runInitializers();
     runLoadHooks('application', this);
 
     this.advanceReadiness();
@@ -675,20 +585,32 @@ var Application = Namespace.extend({
     run.join(this, handleReset);
   },
 
+
+  /**
+    @private
+    @method instanceInitializer
+  */
+  instanceInitializer(options) {
+    this.constructor.instanceInitializer(options);
+  },
+
   /**
     @private
     @method runInitializers
   */
-  runInitializers(registry) {
+  runInitializers() {
     var App = this;
     this._runInitializer('initializers', function(name, initializer) {
       Ember.assert('No application initializer named \'' + name + '\'', !!initializer);
-
-      if (isEnabled('ember-application-initializer-context')) {
-        initializer.initialize(registry, App);
+      if (initializer.initialize.length === 2) {
+        if (isEnabled('ember-registry-container-reform')) {
+          Ember.deprecate('The `initialize` method for Application initializer \'' + name + '\' should take only one argument - `App`, an instance of an `Application`.',
+                          false,
+                          { id: 'ember-application.app-initializer-initialize-arguments', until: '3.0.0' });
+        }
+        initializer.initialize(App.__registry__, App);
       } else {
-        var ref = initializer.initialize;
-        ref(registry, App);
+        initializer.initialize(App);
       }
     });
   },
@@ -722,11 +644,12 @@ var Application = Namespace.extend({
   */
   didBecomeReady() {
     if (this.autoboot) {
+      this.runInstanceInitializers(this.__deprecatedInstance__);
+
       if (environment.hasDOM) {
         this.__deprecatedInstance__.setupEventDispatcher();
       }
 
-      this.runInstanceInitializers(this.__deprecatedInstance__);
       this.ready(); // user hook
       this.__deprecatedInstance__.startRouting();
 
@@ -774,6 +697,10 @@ var Application = Namespace.extend({
     this._bootPromise = null;
     this._bootResolver = null;
 
+    if (_loaded.application === this) {
+      _loaded.application = undefined;
+    }
+
     if (this.__deprecatedInstance__) {
       this.__deprecatedInstance__.destroy();
     }
@@ -781,31 +708,85 @@ var Application = Namespace.extend({
 
   initializer(options) {
     this.constructor.initializer(options);
-  },
-
-  /**
-    @method then
-    @private
-    @deprecated
-  */
-  then() {
-    Ember.deprecate('Do not use `.then` on an instance of Ember.Application.  Please use the `.ready` hook instead.', false, { url: 'http://emberjs.com/guides/deprecations/#toc_deprecate-code-then-code-on-ember-application' });
-
-    this._super(...arguments);
   }
 });
 
-if (isEnabled('ember-application-instance-initializers')) {
-  Application.reopen({
-    instanceInitializer(options) {
-      this.constructor.instanceInitializer(options);
+if (isEnabled('ember-registry-container-reform')) {
+  Object.defineProperty(Application.prototype, 'registry', {
+    configurable: true,
+    enumerable: false,
+    get() {
+      return buildFakeRegistryWithDeprecations(this, 'Application');
     }
   });
-
-  Application.reopenClass({
-    instanceInitializer: buildInitializerMethod('instanceInitializers', 'instance initializer')
-  });
 }
+
+Application.reopenClass({
+  /**
+    Instance initializers run after all initializers have run. Because
+    instance initializers run after the app is fully set up. We have access
+    to the store, container, and other items. However, these initializers run
+    after code has loaded and are not allowed to defer readiness.
+
+    Instance initializer receives an object which has the following attributes:
+    `name`, `before`, `after`, `initialize`. The only required attribute is
+    `initialize`, all others are optional.
+
+    * `name` allows you to specify under which name the instanceInitializer is
+    registered. This must be a unique name, as trying to register two
+    instanceInitializer with the same name will result in an error.
+
+    ```javascript
+    Ember.Application.instanceInitializer({
+      name: 'namedinstanceInitializer',
+
+      initialize: function(application) {
+        Ember.debug('Running namedInitializer!');
+      }
+    });
+    ```
+
+    * `before` and `after` are used to ensure that this initializer is ran prior
+    or after the one identified by the value. This value can be a single string
+    or an array of strings, referencing the `name` of other initializers.
+
+    * See Ember.Application.initializer for discussion on the usage of before
+    and after.
+
+    Example instanceInitializer to preload data into the store.
+
+    ```javascript
+    Ember.Application.initializer({
+      name: 'preload-data',
+
+      initialize: function(application) {
+        var userConfig, userConfigEncoded, store;
+        // We have a HTML escaped JSON representation of the user's basic
+        // configuration generated server side and stored in the DOM of the main
+        // index.html file. This allows the app to have access to a set of data
+        // without making any additional remote calls. Good for basic data that is
+        // needed for immediate rendering of the page. Keep in mind, this data,
+        // like all local models and data can be manipulated by the user, so it
+        // should not be relied upon for security or authorization.
+        //
+        // Grab the encoded data from the meta tag
+        userConfigEncoded = Ember.$('head meta[name=app-user-config]').attr('content');
+        // Unescape the text, then parse the resulting JSON into a real object
+        userConfig = JSON.parse(unescape(userConfigEncoded));
+        // Lookup the store
+        store = application.lookup('service:store');
+        // Push the encoded JSON into the store
+        store.pushPayload(userConfig);
+      }
+    });
+    ```
+
+    @method instanceInitializer
+    @param instanceInitializer
+    @public
+  */
+  instanceInitializer: buildInitializerMethod('instanceInitializers', 'instance initializer')
+});
 
 if (isEnabled('ember-application-visit')) {
   Application.reopen({
@@ -845,10 +826,17 @@ if (isEnabled('ember-application-visit')) {
 }
 
 Application.reopenClass({
-  initializers: Object.create(null),
-  instanceInitializers: Object.create(null),
+  initializers: new EmptyObject(),
+  instanceInitializers: new EmptyObject(),
 
   /**
+    The goal of initializers should be to register dependencies and injections.
+    This phase runs once. Because these initializers may load code, they are
+    allowed to defer application readiness and advance it. If you need to access
+    the container or store you should use an InstanceInitializer that will be run
+    after all initializers and therefore after all code is loaded and the app is
+    ready.
+
     Initializer receives an object which has the following attributes:
     `name`, `before`, `after`, `initialize`. The only required attribute is
     `initialize`, all others are optional.
@@ -861,7 +849,7 @@ Application.reopenClass({
     Ember.Application.initializer({
       name: 'namedInitializer',
 
-      initialize: function(container, application) {
+      initialize: function(application) {
         Ember.debug('Running namedInitializer!');
       }
     });
@@ -877,7 +865,7 @@ Application.reopenClass({
     Ember.Application.initializer({
       name: 'first',
 
-      initialize: function(container, application) {
+      initialize: function(application) {
         Ember.debug('First initializer!');
       }
     });
@@ -893,7 +881,7 @@ Application.reopenClass({
       name: 'second',
       after: 'first',
 
-      initialize: function(container, application) {
+      initialize: function(application) {
         Ember.debug('Second initializer!');
       }
     });
@@ -910,7 +898,7 @@ Application.reopenClass({
       name: 'pre',
       before: 'first',
 
-      initialize: function(container, application) {
+      initialize: function(application) {
         Ember.debug('Pre initializer!');
       }
     });
@@ -928,7 +916,7 @@ Application.reopenClass({
       name: 'post',
       after: ['first', 'second'],
 
-      initialize: function(container, application) {
+      initialize: function(application) {
         Ember.debug('Post initializer!');
       }
     });
@@ -939,22 +927,8 @@ Application.reopenClass({
     // DEBUG: Post initializer!
     ```
 
-    * `initialize` is a callback function that receives two arguments, `container`
-    and `application` on which you can operate.
-
-    Example of using `container` to preload data into the store:
-
-    ```javascript
-    Ember.Application.initializer({
-      name: 'preload-data',
-
-      initialize: function(container, application) {
-        var store = container.lookup('store:main');
-
-        store.pushPayload(preloadedData);
-      }
-    });
-    ```
+    * `initialize` is a callback function that receives one argument,
+      `application`, on which you can operate.
 
     Example of using `application` to register an adapter:
 
@@ -962,7 +936,7 @@ Application.reopenClass({
     Ember.Application.initializer({
       name: 'api-adapter',
 
-      initialize: function(container, application) {
+      initialize: function(application) {
         application.register('api-adapter:main', ApiAdapter);
       }
     });
@@ -971,7 +945,8 @@ Application.reopenClass({
     @method initializer
     @param initializer {Object}
     @public
-   */
+  */
+
   initializer: buildInitializerMethod('initializers', 'initializer'),
 
   /**
@@ -1016,13 +991,13 @@ Application.reopenClass({
     registry.register('application:main', namespace, { instantiate: false });
 
     registry.register('controller:basic', Controller, { instantiate: false });
-    registry.register('controller:object', ObjectController, { instantiate: false });
-    registry.register('controller:array', ArrayController, { instantiate: false });
 
     registry.register('renderer:-dom', { create() { return new Renderer(new DOMHelper()); } });
 
     registry.injection('view', 'renderer', 'renderer:-dom');
-    registry.register('view:select', SelectView);
+    if (Ember.ENV._ENABLE_LEGACY_VIEW_SUPPORT) {
+      registry.register('view:select', SelectView);
+    }
     registry.register('view:-outlet', OutletView);
 
     registry.register('-view-registry:main', { create() { return {}; } });
@@ -1092,9 +1067,7 @@ Application.reopenClass({
   @return {*} the resolved value for a given lookup
 */
 function resolverFor(namespace) {
-  Ember.deprecate('Application.resolver is deprecated in favor of Application.Resolver', !namespace.get('resolver'));
-
-  var ResolverClass = namespace.get('resolver') || namespace.get('Resolver') || DefaultResolver;
+  var ResolverClass = namespace.get('Resolver') || DefaultResolver;
   var resolver = ResolverClass.create({
     namespace: namespace
   });
@@ -1114,9 +1087,6 @@ function resolverFor(namespace) {
   resolve.normalize = function(fullName) {
     if (resolver.normalize) {
       return resolver.normalize(fullName);
-    } else {
-      Ember.deprecate('The Resolver should now provide a \'normalize\' function', false);
-      return fullName;
     }
   };
 

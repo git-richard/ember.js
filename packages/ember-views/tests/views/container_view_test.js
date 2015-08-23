@@ -5,16 +5,20 @@ import { computed } from 'ember-metal/computed';
 import Controller from 'ember-runtime/controllers/controller';
 import jQuery from 'ember-views/system/jquery';
 import View from 'ember-views/views/view';
-import ContainerView from 'ember-views/views/container_view';
+import ContainerView, { DeprecatedContainerView } from 'ember-views/views/container_view';
 import Registry from 'container/registry';
 import compile from 'ember-template-compiler/system/compile';
 import getElementStyle from 'ember-views/tests/test-helpers/get-element-style';
 
-var trim = jQuery.trim;
-var container, registry, view, otherContainer;
+import { registerKeyword, resetKeyword } from 'ember-htmlbars/tests/utils';
+import viewKeyword from 'ember-htmlbars/keywords/view';
 
-QUnit.module('ember-views/views/container_view_test', {
+var trim = jQuery.trim;
+var container, registry, view, otherContainer, originalViewKeyword;
+
+QUnit.module('Ember.ContainerView', {
   setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
     registry = new Registry();
   },
   teardown() {
@@ -23,6 +27,7 @@ QUnit.module('ember-views/views/container_view_test', {
       if (view) { view.destroy(); }
       if (otherContainer) { otherContainer.destroy(); }
     });
+    resetKeyword('view', originalViewKeyword);
   }
 });
 
@@ -52,7 +57,6 @@ QUnit.test('should be able to insert views after the DOM representation is creat
   run(function() {
     container.destroy();
   });
-
 });
 
 QUnit.test('should be able to observe properties that contain child views', function() {
@@ -216,7 +220,7 @@ QUnit.test('should be able to push initial views onto the ContainerView and have
 
   equal(container.lengthSquared(), 4);
 
-  deepEqual(container.mapViewNames(), ['A','B']);
+  deepEqual(container.mapViewNames(), ['A', 'B']);
 
   run(container, 'appendTo', '#qunit-fixture');
 
@@ -231,7 +235,7 @@ QUnit.test('should be able to push initial views onto the ContainerView and have
 
   equal(container.lengthSquared(), 9);
 
-  deepEqual(container.mapViewNames(), ['A','B','C']);
+  deepEqual(container.mapViewNames(), ['A', 'B', 'C']);
 
   equal(container.$().text(), 'ABC');
 
@@ -452,14 +456,38 @@ QUnit.test('if a ContainerView starts with a currentView and then a different cu
   equal(trim(container.$().text()), 'This is the tertiary view.', 'should render its child');
 });
 
-QUnit.test('should be able to modify childViews many times during an run loop', function () {
+var child, count;
+QUnit.module('Ember.ContainerView - modify childViews', {
+  setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
+    registry = new Registry();
+    container = ContainerView.create({
+      _viewRegistry: { }
+    });
 
-  container = ContainerView.create();
+    run(function() {
+      container.appendTo('#qunit-fixture');
+    });
 
-  run(function() {
-    container.appendTo('#qunit-fixture');
-  });
+    count = 0;
+    child = View.create({
+      template: function () {
+        count++;
+        return 'child';
+      }
+    });
+  },
+  teardown() {
+    run(function() {
+      container.destroy();
+      if (view) { view.destroy(); }
+      if (child) { child.destroy(); }
+      if (otherContainer) { otherContainer.destroy(); }
+    });
+  }
+});
 
+QUnit.test('should be able to modify childViews many times during a run loop', function () {
   var one = View.create({
     template: compile('one')
   });
@@ -485,13 +513,15 @@ QUnit.test('should be able to modify childViews many times during an run loop', 
 });
 
 QUnit.test('should be able to modify childViews then rerender the ContainerView in same run loop', function () {
-  container = ContainerView.create();
+  container = ContainerView.create({
+  });
 
   run(function() {
     container.appendTo('#qunit-fixture');
   });
 
   var child = View.create({
+    _viewRegistry: { },
     template: compile('child')
   });
 
@@ -501,6 +531,24 @@ QUnit.test('should be able to modify childViews then rerender the ContainerView 
   });
 
   equal(trim(container.$().text()), 'child');
+});
+
+QUnit.test('should be able to modify childViews then remove the ContainerView in same run loop', function () {
+  run(function() {
+    container.pushObject(child);
+    container.remove();
+  });
+
+  equal(count, 0, 'did not render child');
+});
+
+QUnit.test('should be able to modify childViews then destroy the ContainerView in same run loop', function () {
+  run(function() {
+    container.pushObject(child);
+    container.destroy();
+  });
+
+  equal(count, 0, 'did not render child');
 });
 
 QUnit.test('should be able to modify childViews then rerender then modify again the ContainerView in same run loop', function () {
@@ -569,6 +617,20 @@ QUnit.test('should be able to modify childViews then rerender again the Containe
   equal(trim(container.$().text()), 'onetwo');
 });
 
+QUnit.module('Ember.ContainerView', {
+  setup() {
+    originalViewKeyword = registerKeyword('view',  viewKeyword);
+    registry = new Registry();
+  },
+  teardown() {
+    run(function() {
+      container.destroy();
+      if (view) { view.destroy(); }
+      if (otherContainer) { otherContainer.destroy(); }
+    });
+  }
+});
+
 QUnit.test('should invalidate `element` on itself and childViews when being rendered by ensureChildrenAreInDOM', function () {
   expectDeprecation('Setting `childViews` on a Container is deprecated.');
 
@@ -631,14 +693,11 @@ QUnit.test('Child view can only be added to one container at a time', function (
 });
 
 QUnit.test('if a containerView appends a child in its didInsertElement event, the didInsertElement event of the child view should be fired once', function (assert) {
-
   var counter = 0;
   var root = ContainerView.create({});
 
   container = ContainerView.create({
-
     didInsertElement() {
-
       var view = ContainerView.create({
         didInsertElement() {
           counter++;
@@ -646,9 +705,7 @@ QUnit.test('if a containerView appends a child in its didInsertElement event, th
       });
 
       this.pushObject(view);
-
     }
-
   });
 
   run(function() {
@@ -666,7 +723,6 @@ QUnit.test('if a containerView appends a child in its didInsertElement event, th
   run(function() {
     root.destroy();
   });
-
 });
 
 
@@ -798,4 +854,19 @@ QUnit.test('renders contained view with omitted start tag and parent view contex
 
   equal(view.element.tagName, 'TABLE', 'container view is table');
   equal(view.element.childNodes[2].tagName, 'TR', 'inner view is tr');
+});
+
+QUnit.module('DeprecatedContainerView');
+
+QUnit.test('calling reopen on DeprecatedContainerView delegates to ContainerView', function() {
+  expect(2);
+  var originalReopen = ContainerView.reopen;
+  var obj = {};
+
+  ContainerView.reopen = function(arg) { ok(arg === obj); };
+
+  expectNoDeprecation();
+  DeprecatedContainerView.reopen(obj);
+
+  ContainerView.reopen = originalReopen;
 });

@@ -1,7 +1,7 @@
 ---
 language: node_js
 node_js:
-  - "0.10"
+  - "iojs"
 
 sudo: false
 
@@ -14,6 +14,7 @@ before_install:
   - "npm config set spin false"
   - "npm install -g npm@^2"
   - "npm --version"
+  - "phantomjs --version"
 
 install:
   - "npm install"
@@ -53,7 +54,6 @@ env:
   matrix:
     - TEST_SUITE=each-package-tests
     - TEST_SUITE=built-tests EMBER_ENV=production DISABLE_JSCS=true DISABLE_JSHINT=true
-    - TEST_SUITE=old-jquery
-    - TEST_SUITE=extend-prototypes
+    - TEST_SUITE=old-jquery-and-extend-prototypes
     - TEST_SUITE=node DISABLE_JSCS=true DISABLE_JSHINT=true
     - TEST_SUITE=sauce

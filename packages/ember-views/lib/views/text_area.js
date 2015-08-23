@@ -2,14 +2,14 @@
 @module ember
 @submodule ember-views
 */
-import Component from 'ember-views/views/component';
+import Component from 'ember-views/components/component';
 import TextSupport from 'ember-views/mixins/text_support';
 
 /**
   The internal class used to create textarea element when the `{{textarea}}`
   helper is used.
 
-  See [handlebars.helpers.textarea](/api/classes/Ember.Handlebars.helpers.html#method_textarea)  for usage details.
+  See [Ember.Templates.helpers.textarea](/api/classes/Ember.Templates.helpers.html#method_textarea)  for usage details.
 
   ## Layout and LayoutName properties
 

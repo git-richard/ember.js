@@ -182,7 +182,9 @@ function fillIn(app, selector, contextOrText, text) {
   $el = app.testHelpers.findWithAssert(selector, context);
   focus($el);
   run(function() {
-    $el.val(text).change();
+    $el.val(text);
+    $el.trigger('input');
+    $el.change();
   });
   return app.testHelpers.wait();
 }
@@ -236,7 +238,6 @@ function wait(app, value) {
       run(null, resolve, value);
     }, 10);
   });
-
 }
 
 
@@ -390,7 +391,7 @@ helper('find', find);
   the DOM
   @return {Object} jQuery object representing the results of the query
   @throws {Error} throws error if jQuery object returned has a length of 0
-  @private
+  @public
 */
 helper('findWithAssert', findWithAssert);
 

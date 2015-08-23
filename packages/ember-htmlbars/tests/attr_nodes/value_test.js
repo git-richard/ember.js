@@ -1,4 +1,3 @@
-import isEnabled from 'ember-metal/features';
 import EmberView from 'ember-views/views/view';
 import run from 'ember-metal/run_loop';
 import compile from 'ember-template-compiler/system/compile';
@@ -9,10 +8,7 @@ function appendView(view) {
   run(function() { view.appendTo('#qunit-fixture'); });
 }
 
-// jscs:disable validateIndentation
-if (isEnabled('ember-htmlbars-attribute-syntax')) {
-
-  QUnit.module('ember-htmlbars: value attribute', {
+QUnit.module('ember-htmlbars: value attribute', {
   teardown() {
     if (view) {
       run(view, view.destroy);
@@ -20,7 +16,7 @@ if (isEnabled('ember-htmlbars-attribute-syntax')) {
   }
 });
 
-  QUnit.test('property is output', function() {
+QUnit.test('property is output', function() {
   view = EmberView.create({
     context: { name: 'rick' },
     template: compile('<input value={{name}}>')
@@ -32,7 +28,7 @@ if (isEnabled('ember-htmlbars-attribute-syntax')) {
         'property is set true');
 });
 
-  QUnit.test('string property is output', function() {
+QUnit.test('string property is output', function() {
   view = EmberView.create({
     context: { name: 'rick' },
     template: compile('<input value=\'{{name}}\'>')
@@ -44,7 +40,7 @@ if (isEnabled('ember-htmlbars-attribute-syntax')) {
         'property is set true');
 });
 
-  QUnit.test('blank property is output', function() {
+QUnit.test('blank property is output', function() {
   view = EmberView.create({
     context: { name: '' },
     template: compile('<input value={{name}}>')
@@ -55,6 +51,3 @@ if (isEnabled('ember-htmlbars-attribute-syntax')) {
   equal(view.element.firstChild.value, '',
         'property is set true');
 });
-
-}
-// jscs:enable validateIndentation

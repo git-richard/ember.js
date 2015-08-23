@@ -6,7 +6,7 @@ var application, registry;
 QUnit.module('Ember.Application Dependency Injection – normalization', {
   setup() {
     application = run(Application, 'create');
-    registry = application.registry;
+    registry = application.__registry__;
   },
 
   teardown() {
@@ -22,14 +22,18 @@ QUnit.test('normalization', function() {
   equal(registry.normalize('controller:posts'), 'controller:posts');
   equal(registry.normalize('controller:posts_index'), 'controller:postsIndex');
   equal(registry.normalize('controller:posts.index'), 'controller:postsIndex');
+  equal(registry.normalize('controller:posts-index'), 'controller:postsIndex');
   equal(registry.normalize('controller:posts.post.index'), 'controller:postsPostIndex');
   equal(registry.normalize('controller:posts_post.index'), 'controller:postsPostIndex');
   equal(registry.normalize('controller:posts.post_index'), 'controller:postsPostIndex');
+  equal(registry.normalize('controller:posts.post-index'), 'controller:postsPostIndex');
   equal(registry.normalize('controller:postsIndex'), 'controller:postsIndex');
   equal(registry.normalize('controller:blogPosts.index'), 'controller:blogPostsIndex');
   equal(registry.normalize('controller:blog/posts.index'), 'controller:blog/postsIndex');
+  equal(registry.normalize('controller:blog/posts-index'), 'controller:blog/postsIndex');
   equal(registry.normalize('controller:blog/posts.post.index'), 'controller:blog/postsPostIndex');
   equal(registry.normalize('controller:blog/posts_post.index'), 'controller:blog/postsPostIndex');
+  equal(registry.normalize('controller:blog/posts_post-index'), 'controller:blog/postsPostIndex');
 
   equal(registry.normalize('template:blog/posts_index'), 'template:blog/posts_index');
 });

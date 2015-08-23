@@ -31,18 +31,20 @@ proto.addDestruction = function(toDestroy) {
 };
 
 proto.cleanup = function() {
-  var view;
+  let view = this.emberView;
 
-  if (view = this.emberView) {
-    if (!view.ownerView.isDestroyingSubtree) {
-      view.ownerView.isDestroyingSubtree = true;
-      if (view.parentView) { view.parentView.removeChild(view); }
+  if (view) {
+    let parentView = view.parentView;
+
+    if (parentView && view.ownerView._destroyingSubtreeForView === parentView) {
+      parentView.removeChild(view);
     }
   }
 
-  var toDestroy = this.emberToDestroy;
+  let toDestroy = this.emberToDestroy;
+
   if (toDestroy) {
-    for (var i=0, l=toDestroy.length; i<l; i++) {
+    for (var i = 0, l = toDestroy.length; i < l; i++) {
       toDestroy[i].destroy();
     }
 

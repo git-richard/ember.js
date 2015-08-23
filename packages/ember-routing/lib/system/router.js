@@ -1,13 +1,12 @@
 import Ember from 'ember-metal/core'; // FEATURES, Logger, assert
-import isEnabled from 'ember-metal/features';
 import EmberError from 'ember-metal/error';
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
 import { defineProperty } from 'ember-metal/properties';
+import EmptyObject from 'ember-metal/empty_object';
 import { computed } from 'ember-metal/computed';
 import merge from 'ember-metal/merge';
 import run from 'ember-metal/run_loop';
-import { fmt } from 'ember-runtime/system/string';
 import EmberObject from 'ember-runtime/system/object';
 import Evented from 'ember-runtime/mixins/evented';
 import EmberRouterDSL from 'ember-routing/system/dsl';
@@ -85,7 +84,7 @@ var EmberRouter = EmberObject.extend(Evented, {
 
     function generateDSL() {
       this.route('application', { path: '/', resetNamespace: true, overrideNameAssertion: true }, function() {
-        for (var i=0; i < dslCallbacks.length; i++) {
+        for (var i = 0; i < dslCallbacks.length; i++) {
           dslCallbacks[i].call(this);
         }
       });
@@ -102,7 +101,7 @@ var EmberRouter = EmberObject.extend(Evented, {
 
   init() {
     this._activeViews = {};
-    this._qpCache = {};
+    this._qpCache = new EmptyObject();
     this._resetQueuedQueryParameterChanges();
   },
 
@@ -178,8 +177,26 @@ var EmberRouter = EmberObject.extend(Evented, {
 
     Triggers the router level `didTransition` hook.
 
+    For example, to notify google analytics when the route changes,
+    you could use this hook.  (Note: requires also including GA scripts, etc.)
+
+    ```javascript
+    var Router = Ember.Router.extend({
+      location: config.locationType,
+
+      didTransition: function() {
+        this._super(...arguments);
+
+        return ga('send', 'pageview', {
+            'page': this.get('url'),
+            'title': this.get('url')
+          });
+      }
+    });
+    ```
+
     @method didTransition
-    @private
+    @public
     @since 1.2.0
   */
   didTransition(infos) {
@@ -241,7 +258,7 @@ var EmberRouter = EmberObject.extend(Evented, {
     Triggers the router level `willTransition` hook.
 
     @method willTransition
-    @private
+    @public
     @since 1.11.0
   */
   willTransition(oldInfos, newInfos, transition) {
@@ -271,7 +288,7 @@ var EmberRouter = EmberObject.extend(Evented, {
       return this._doURLTransition('transitionTo', args[0]);
     }
 
-    var possibleQueryParams = args[args.length-1];
+    var possibleQueryParams = args[args.length - 1];
     if (possibleQueryParams && possibleQueryParams.hasOwnProperty('queryParams')) {
       queryParams = args.pop().queryParams;
     } else {
@@ -464,7 +481,7 @@ var EmberRouter = EmberObject.extend(Evented, {
   },
 
   _getHandlerFunction() {
-    var seen = Object.create(null);
+    var seen = new EmptyObject();
     var container = this.container;
     var DefaultRoute = container.lookupFactory('route:basic');
 
@@ -479,7 +496,7 @@ var EmberRouter = EmberObject.extend(Evented, {
       seen[name] = true;
 
       if (!handler) {
-        container._registry.register(routeName, DefaultRoute.extend());
+        container.registry.register(routeName, DefaultRoute.extend());
         handler = container.lookup(routeName);
 
         if (get(this, 'namespace.LOG_ACTIVE_GENERATION')) {
@@ -522,11 +539,9 @@ var EmberRouter = EmberObject.extend(Evented, {
       emberRouter.didTransition(infos);
     };
 
-    if (isEnabled('ember-router-willtransition')) {
-      router.willTransition = function(oldInfos, newInfos, transition) {
-        emberRouter.willTransition(oldInfos, newInfos, transition);
-      };
-    }
+    router.willTransition = function(oldInfos, newInfos, transition) {
+      emberRouter.willTransition(oldInfos, newInfos, transition);
+    };
   },
 
   _serializeQueryParams(targetRouteName, queryParams) {
@@ -546,12 +561,7 @@ var EmberRouter = EmberObject.extend(Evented, {
 
     for (var key in groupedByUrlKey) {
       var qps = groupedByUrlKey[key];
-      Ember.assert(fmt('You\'re not allowed to have more than one controller ' +
-                       'property map to the same query param key, but both ' +
-                       '`%@` and `%@` map to `%@`. You can fix this by mapping ' +
-                       'one of the controller properties to a different query ' +
-                       'param key via the `as` config option, e.g. `%@: { as: \'other-%@\' }`',
-                       [qps[0].qp.scopedPropertyName, qps[1] ? qps[1].qp.scopedPropertyName : '', qps[0].qp.urlKey, qps[0].qp.prop, qps[0].qp.prop]), qps.length <= 1);
+      Ember.assert(`You're not allowed to have more than one controller property map to the same query param key, but both \`${qps[0].qp.scopedPropertyName}\` and \`${qps[1] ? qps[1].qp.scopedPropertyName : ''}\` map to \`${qps[0].qp.urlKey}\`. You can fix this by mapping one of the controller properties to a different query param key via the \`as\` config option, e.g. \`${qps[0].qp.prop}: { as: \'other-${qps[0].qp.prop}\' }\``, qps.length <= 1);
       var qp = qps[0].qp;
       queryParams[qp.urlKey] = qp.route.serializeQueryParam(qps[0].value, qp.urlKey, qp.type);
     }
@@ -814,12 +824,10 @@ function findChildRouteName(parentRoute, originatingChildRoute, name) {
   var targetChildRouteName = originatingChildRoute.routeName.split('.').pop();
   var namespace = parentRoute.routeName === 'application' ? '' : parentRoute.routeName + '.';
 
-  if (isEnabled('ember-routing-named-substates')) {
-    // First, try a named loading state, e.g. 'foo_loading'
-    childName = namespace + targetChildRouteName + '_' + name;
-    if (routeHasBeenDefined(router, childName)) {
-      return childName;
-    }
+  // First, try a named loading state, e.g. 'foo_loading'
+  childName = namespace + targetChildRouteName + '_' + name;
+  if (routeHasBeenDefined(router, childName)) {
+    return childName;
   }
 
   // Second, try general loading state, e.g. 'loading'
@@ -832,7 +840,7 @@ function findChildRouteName(parentRoute, originatingChildRoute, name) {
 function routeHasBeenDefined(router, name) {
   var container = router.container;
   return router.hasRoute(name) &&
-         (container._registry.has(`template:${name}`) || container._registry.has(`route:${name}`));
+         (container.registry.has(`template:${name}`) || container.registry.has(`route:${name}`));
 }
 
 function triggerEvent(handlerInfos, ignoreFailure, args) {
@@ -850,8 +858,8 @@ function triggerEvent(handlerInfos, ignoreFailure, args) {
     handlerInfo = handlerInfos[i];
     handler = handlerInfo.handler;
 
-    if (handler._actions && handler._actions[name]) {
-      if (handler._actions[name].apply(handler, args) === true) {
+    if (handler.actions && handler.actions[name]) {
+      if (handler.actions[name].apply(handler, args) === true) {
         eventWasHandled = true;
       } else {
         return;
@@ -886,7 +894,14 @@ function calculatePostTransitionState(emberRouter, leafRouteName, contexts) {
 }
 
 function updatePaths(router) {
-  var appController = router.container.lookup('controller:application');
+  let infos = router.router.currentHandlerInfos;
+  let path = EmberRouter._routePath(infos);
+  let currentRouteName = infos[infos.length - 1].name;
+
+  set(router, 'currentPath', path);
+  set(router, 'currentRouteName', currentRouteName);
+
+  let appController = router.container.lookup('controller:application');
 
   if (!appController) {
     // appController might not exist when top-level loading/error
@@ -895,22 +910,17 @@ function updatePaths(router) {
     return;
   }
 
-  var infos = router.router.currentHandlerInfos;
-  var path = EmberRouter._routePath(infos);
-
   if (!('currentPath' in appController)) {
     defineProperty(appController, 'currentPath');
   }
 
   set(appController, 'currentPath', path);
-  set(router, 'currentPath', path);
 
   if (!('currentRouteName' in appController)) {
     defineProperty(appController, 'currentRouteName');
   }
 
-  set(appController, 'currentRouteName', infos[infos.length - 1].name);
-  set(router, 'currentRouteName', infos[infos.length - 1].name);
+  set(appController, 'currentRouteName', currentRouteName);
 }
 
 EmberRouter.reopenClass({
@@ -958,7 +968,6 @@ EmberRouter.reopenClass({
     @public
   */
   map(callback) {
-
     if (!this.dslCallbacks) {
       this.dslCallbacks = [];
       this.reopenClass({ dslCallbacks: this.dslCallbacks });
@@ -986,7 +995,7 @@ EmberRouter.reopenClass({
     }
 
     var name, nameParts, oldNameParts;
-    for (var i=1, l=handlerInfos.length; i<l; i++) {
+    for (var i = 1, l = handlerInfos.length; i < l; i++) {
       name = handlerInfos[i].name;
       nameParts = name.split('.');
       oldNameParts = slice.call(path);
@@ -1016,14 +1025,6 @@ function didBeginTransition(transition, router) {
     router.set('currentState', routerState);
   }
   router.set('targetState', routerState);
-
-  transition.then(null, function(error) {
-    if (!error || !error.name) { return; }
-
-    Ember.assert(`The URL '${error.message}' did not match any routes in your application`, error.name !== 'UnrecognizedURLError');
-
-    return error;
-  }, 'Ember: Process errors from Router');
 }
 
 function resemblesURL(str) {
@@ -1063,7 +1064,7 @@ function appendLiveRoute(liveRoutes, defaultParentState, renderOptions) {
   var target;
   var myState = {
     render: renderOptions,
-    outlets: Object.create(null)
+    outlets: new EmptyObject()
   };
   if (renderOptions.into) {
     target = findLiveRoute(liveRoutes, renderOptions.into);
@@ -1097,7 +1098,7 @@ function appendOrphan(liveRoutes, into, myState) {
       render: {
         name: '__ember_orphans__'
       },
-      outlets: Object.create(null)
+      outlets: new EmptyObject()
     };
   }
   liveRoutes.outlets.__ember_orphans__.outlets[into] = myState;

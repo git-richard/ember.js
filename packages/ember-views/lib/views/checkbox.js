@@ -1,6 +1,6 @@
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
-import EmberComponent from 'ember-views/views/component';
+import EmberComponent from 'ember-views/components/component';
 
 /**
 @module ember
@@ -11,7 +11,7 @@ import EmberComponent from 'ember-views/views/component';
   The internal class used to create text inputs when the `{{input}}`
   helper is used with `type` of `checkbox`.
 
-  See [handlebars.helpers.input](/api/classes/Ember.Handlebars.helpers.html#method_input)  for usage details.
+  See [Ember.Templates.helpers.input](/api/classes/Ember.Templates.helpers.html#method_input)  for usage details.
 
   ## Direct manipulation of `checked`
 

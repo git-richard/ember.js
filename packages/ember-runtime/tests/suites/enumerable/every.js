@@ -33,7 +33,7 @@ suite.test('every should stop invoking when you return false', function() {
 
   result = obj.every(function(i) {
     found.push(i);
-    return --cnt>0;
+    return --cnt > 0;
   });
   equal(result, false, 'return value of obj.every');
   equal(found.length, exp, 'should invoke proper number of times');
@@ -75,16 +75,6 @@ suite.test('should return true if every property matches null', function() {
 
   equal(obj.isEvery('foo', null), true, 'isEvery(\'foo\', null)');
   equal(obj.isEvery('bar', null), false, 'isEvery(\'bar\', null)');
-});
-
-suite.test('everyBy should be aliased to isEvery', function() {
-  var obj = this.newObject();
-  equal(obj.isEvery, obj.everyBy);
-});
-
-suite.test('everyProperty should be aliased to isEvery', function() {
-  var obj = this.newObject();
-  equal(obj.isEvery, obj.everyProperty);
 });
 
 suite.test('should return true if every property is undefined', function() {

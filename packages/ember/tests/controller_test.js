@@ -1,7 +1,10 @@
 import 'ember';
 import Ember from 'ember-metal/core';
-import EmberHandlebars from 'ember-htmlbars/compat';
+import { compile } from 'ember-template-compiler';
 import EmberView from 'ember-views/views/view';
+
+import plugins, { registerPlugin } from 'ember-template-compiler/plugins';
+import TransformEachIntoCollection from 'ember-template-compiler/plugins/transform-each-into-collection';
 
 /*
  In Ember 1.x, controllers subtly affect things like template scope
@@ -11,11 +14,15 @@ import EmberView from 'ember-views/views/view';
  from the runtime up to the templating layer.
 */
 
-var compile = EmberHandlebars.compile;
 var App, $fixture, templates;
+
+let originalAstPlugins;
 
 QUnit.module('Template scoping examples', {
   setup() {
+    originalAstPlugins = plugins['ast'].slice(0);
+    registerPlugin('ast', TransformEachIntoCollection);
+
     Ember.run(function() {
       templates = Ember.TEMPLATES;
       App = Ember.Application.create({
@@ -42,6 +49,8 @@ QUnit.module('Template scoping examples', {
     App = null;
 
     Ember.TEMPLATES = {};
+
+    plugins['ast'] = originalAstPlugins;
   }
 });
 
@@ -113,39 +122,6 @@ QUnit.test('{{#each}} inside outlet can have an itemController', function(assert
   bootApp();
 
   assert.equal($fixture.find('p').length, 3, 'the {{#each}} rendered without raising an exception');
-});
-
-QUnit.test('actions within a context shifting {{each}} with `itemController` [DEPRECATED]', function(assert) {
-  expectDeprecation(function() {
-    templates.index = compile(`
-      {{#each model itemController='thing'}}
-        {{controller}}
-        <p><a {{action 'checkController' controller}}>Click me</a></p>
-      {{/each}}
-    `);
-  });
-
-  App.IndexRoute = Ember.Route.extend({
-    model: function() {
-      return Ember.A([
-        { name: 'red' },
-        { name: 'yellow' },
-        { name: 'blue' }
-      ]);
-    }
-  });
-
-  App.ThingController = Ember.Controller.extend({
-    actions: {
-      checkController: function(controller) {
-        assert.ok(controller === this, 'correct controller was passed as action context');
-      }
-    }
-  });
-
-  bootApp();
-
-  $fixture.find('a').first().click();
 });
 
 function bootApp() {

@@ -21,7 +21,6 @@ import {
 } from 'ember-metal/property_events';
 import {
   addObserver,
-  addBeforeObserver,
   removeObserver,
   observersFor
 } from 'ember-metal/observer';
@@ -64,9 +63,9 @@ import isNone from 'ember-metal/is_none';
 
   ```javascript
   Ember.Object.extend({
-    valueObserver: function() {
+    valueObserver: Ember.observer('value', function() {
       // Executes whenever the "value" property changes
-    }.observes('value')
+    })
   });
   ```
 
@@ -321,17 +320,12 @@ export default Mixin.create({
     @method notifyPropertyChange
     @param {String} keyName The property key to be notified about.
     @return {Ember.Observable}
-    @private
+    @public
   */
   notifyPropertyChange(keyName) {
     this.propertyWillChange(keyName);
     this.propertyDidChange(keyName);
     return this;
-  },
-
-  addBeforeObserver(key, target, method) {
-    Ember.deprecate('Before observers are deprecated and will be removed in a future release. If you want to keep track of previous values you have to implement it yourself.', false, { url: 'http://emberjs.com/guides/deprecations/#toc_deprecate-beforeobservers' });
-    addBeforeObserver(this, key, target, method);
   },
 
   /**
@@ -413,7 +407,7 @@ export default Mixin.create({
     @private
   */
   hasObserverFor(key) {
-    return hasListeners(this, key+':change');
+    return hasListeners(this, key + ':change');
   },
 
   /**
