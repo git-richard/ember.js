@@ -1,5 +1,5 @@
-import Ember from 'ember-metal/core';
-import Stream from './stream';
+import { assert } from 'ember-metal/debug';
+import BasicStream, { Stream } from './stream';
 
 /*
  Check whether an object is a stream or not
@@ -156,6 +156,26 @@ export function scanHash(hash) {
   return containsStream;
 }
 
+let ConcatStream = BasicStream.extend({
+  init(array, separator) {
+    this.array = array;
+    this.separator = separator;
+
+    // used by angle bracket components to detect an attribute was provided
+    // as a string literal
+    this.isConcat = true;
+  },
+
+  label() {
+    let labels = labelsFor(this.array);
+    return `concat([${labels.join(', ')}]; separator=${inspect(this.separator)})`;
+  },
+
+  compute() {
+    return concat(readArray(this.array), this.separator);
+  }
+});
+
 /*
  Join an array, with any streams replaced by their current values
 
@@ -174,21 +194,12 @@ export function concat(array, separator) {
   // subscribing to streams until the value() is called.
   var hasStream = scanArray(array);
   if (hasStream) {
-    var i, l;
-    var stream = new Stream(function() {
-      return concat(readArray(array), separator);
-    }, function() {
-      var labels = labelsFor(array);
-      return `concat([${labels.join(', ')}]; separator=${inspect(separator)})`;
-    });
+    let stream = new ConcatStream(array, separator);
 
-    for (i = 0, l = array.length; i < l; i++) {
-      subscribe(array[i], stream.notify, stream);
+    for (let i = 0, l = array.length; i < l; i++) {
+      addDependency(stream, array[i]);
     }
 
-    // used by angle bracket components to detect an attribute was provided
-    // as a string literal
-    stream.isConcat = true;
     return stream;
   } else {
     return array.join(separator);
@@ -248,14 +259,14 @@ export function or(first, second) {
 }
 
 export function addDependency(stream, dependency) {
-  Ember.assert('Cannot add a stream as a dependency to a non-stream', isStream(stream) || !isStream(dependency));
+  assert('Cannot add a stream as a dependency to a non-stream', isStream(stream) || !isStream(dependency));
   if (isStream(stream)) {
     stream.addDependency(dependency);
   }
 }
 
 export function zip(streams, callback, label) {
-  Ember.assert('Must call zip with a label', !!label);
+  assert('Must call zip with a label', !!label);
 
   var stream = new Stream(function() {
     var array = readArray(streams);
@@ -272,7 +283,7 @@ export function zip(streams, callback, label) {
 }
 
 export function zipHash(object, callback, label) {
-  Ember.assert('Must call zipHash with a label', !!label);
+  assert('Must call zipHash with a label', !!label);
 
   var stream = new Stream(function() {
     var hash = readHash(object);
@@ -321,7 +332,7 @@ export function zipHash(object, callback, label) {
                          function `fn`.
  */
 export function chain(value, fn, label) {
-  Ember.assert('Must call chain with a label', !!label);
+  assert('Must call chain with a label', !!label);
   if (isStream(value)) {
     var stream = new Stream(fn, function() { return `${label}(${labelFor(value)})`; });
     stream.addDependency(value);

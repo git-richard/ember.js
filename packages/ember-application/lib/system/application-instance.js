@@ -1,10 +1,9 @@
 /**
 @module ember
 @submodule ember-application
-@private
 */
 
-import Ember from 'ember-metal'; // Ember.deprecate
+import { deprecate } from 'ember-metal/debug';
 import isEnabled from 'ember-metal/features';
 import { get } from 'ember-metal/property_get';
 import { set } from 'ember-metal/property_set';
@@ -37,6 +36,10 @@ import assign from 'ember-metal/assign';
   it once the particular test run or FastBoot request has finished.
 
   @public
+  @class Ember.ApplicationInstance
+  @extends Ember.Object
+  @uses RegistryProxyMixin
+  @uses ContainerProxyMixin
 */
 
 let ApplicationInstance = EmberObject.extend(RegistryProxy, ContainerProxy, {
@@ -221,9 +224,10 @@ if (isEnabled('ember-registry-container-reform')) {
       var instance = this;
       return {
         lookup() {
-          Ember.deprecate('Using `ApplicationInstance.container.lookup` is deprecated. Please use `ApplicationInstance.lookup` instead.',
-                          false,
-                          { id: 'ember-application.app-instance-container', until: '3.0.0' });
+          deprecate(
+            'Using `ApplicationInstance.container.lookup` is deprecated. Please use `ApplicationInstance.lookup` instead.',
+            false, { id: 'ember-application.app-instance-container', until: '3.0.0' }
+          );
           return instance.lookup(...arguments);
         }
       };

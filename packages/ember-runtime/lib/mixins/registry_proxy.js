@@ -1,6 +1,18 @@
-import Ember from 'ember-metal/core';
+/**
+@module ember
+@submodule ember-runtime
+*/
+
+import { deprecate } from 'ember-metal/debug';
 import { Mixin } from 'ember-metal/mixin';
 
+/**
+  RegistryProxyMixin is used to provide public access to specific
+  registry functionality.
+
+  @class RegistryProxyMixin
+  @private
+*/
 export default Mixin.create({
   __registry__: null,
 
@@ -67,7 +79,6 @@ export default Mixin.create({
     App.register('session', App.session, { instantiate: false });
     ```
 
-    @public
     @method register
     @param  fullName {String} type:name (e.g., 'model:user')
     @param  factory {Function} (e.g., App.Person)
@@ -272,9 +283,11 @@ export function buildFakeRegistryWithDeprecations(instance, typeForMessage) {
 
 function buildFakeRegistryFunction(instance, typeForMessage, deprecatedProperty, nonDeprecatedProperty) {
   return function() {
-    Ember.deprecate(`Using \`${typeForMessage}.registry.${deprecatedProperty}\` is deprecated. Please use \`${typeForMessage}.${nonDeprecatedProperty}\` instead.`,
-                    false,
-                    { id: 'ember-application.app-instance-registry', until: '3.0.0' });
+    deprecate(
+      `Using \`${typeForMessage}.registry.${deprecatedProperty}\` is deprecated. Please use \`${typeForMessage}.${nonDeprecatedProperty}\` instead.`,
+      false,
+      { id: 'ember-application.app-instance-registry', until: '3.0.0' }
+    );
     return instance[nonDeprecatedProperty](...arguments);
   };
 }

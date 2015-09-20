@@ -1,7 +1,6 @@
+'no use strict';
 // Remove "use strict"; from transpiled module until
 // https://bugs.webkit.org/show_bug.cgi?id=138038 is fixed
-//
-'REMOVE_USE_STRICT: true';
 
 /**
 @module ember
@@ -9,7 +8,8 @@
 */
 
 import Ember from 'ember-metal/core'; // warn, assert, wrap, et;
-import merge from 'ember-metal/merge';
+import { assert, deprecate, runInDebug } from 'ember-metal/debug';
+import assign from 'ember-metal/assign';
 import EmptyObject from 'ember-metal/empty_object';
 import { get } from 'ember-metal/property_get';
 import { set, trySet } from 'ember-metal/property_set';
@@ -43,10 +43,6 @@ ROOT.__hasSuper = false;
 var REQUIRED;
 var a_slice = [].slice;
 
-function mixinsMeta(obj) {
-  return metaFor(obj, true).writableMixins();
-}
-
 function isMethod(obj) {
   return 'function' === typeof obj &&
          obj.isMethod !== false &&
@@ -65,8 +61,8 @@ function mixinProperties(mixinsMeta, mixin) {
 
   if (mixin instanceof Mixin) {
     guid = guidFor(mixin);
-    if (mixinsMeta[guid]) { return CONTINUE; }
-    mixinsMeta[guid] = mixin;
+    if (mixinsMeta.peekMixins(guid)) { return CONTINUE; }
+    mixinsMeta.writeMixins(guid, mixin);
     return mixin.properties;
   } else {
     return mixin; // apply anonymous mixin properties
@@ -165,9 +161,7 @@ function applyConcatenatedProperties(obj, key, value, values) {
 function applyMergedProperties(obj, key, value, values) {
   var baseValue = values[key] || obj[key];
 
-  Ember.runInDebug(function() {
-    var assert = Ember.assert; // prevent defeatureify errors
-
+  runInDebug(function() {
     if (Array.isArray(value)) { // use conditional to avoid stringifying every time
       assert(`You passed in \`${JSON.stringify(value)}\` as the value for \`${key}\` but \`${key}\` cannot be an Array`, false);
     }
@@ -175,7 +169,7 @@ function applyMergedProperties(obj, key, value, values) {
 
   if (!baseValue) { return value; }
 
-  var newBase = merge({}, baseValue);
+  var newBase = assign({}, baseValue);
   var hasFunction = false;
 
   for (var prop in value) {
@@ -236,8 +230,10 @@ function mergeMixins(mixins, m, descs, values, base, keys) {
 
   for (var i = 0, l = mixins.length; i < l; i++) {
     currentMixin = mixins[i];
-    Ember.assert(`Expected hash or Mixin instance, got ${Object.prototype.toString.call(currentMixin)}`,
-                 typeof currentMixin === 'object' && currentMixin !== null && Object.prototype.toString.call(currentMixin) !== '[object Array]');
+    assert(
+      `Expected hash or Mixin instance, got ${Object.prototype.toString.call(currentMixin)}`,
+      typeof currentMixin === 'object' && currentMixin !== null && Object.prototype.toString.call(currentMixin) !== '[object Array]'
+    );
 
     props = mixinProperties(m, currentMixin);
     if (props === CONTINUE) { continue; }
@@ -267,7 +263,7 @@ var IS_BINDING = /^.+Binding$/;
 
 function detectBinding(obj, key, value, m) {
   if (IS_BINDING.test(key)) {
-    m.writableBindings()[key] = value;
+    m.writeBindings(key, value);
   }
 }
 
@@ -298,29 +294,24 @@ function connectStreamBinding(obj, key, stream) {
 
 function connectBindings(obj, m) {
   // TODO Mixin.apply(instance) should disconnect binding if exists
-  var bindings = m.readableBindings();
-  var key, binding, to;
-  if (bindings) {
-    for (key in bindings) {
-      binding = bindings[key];
-      if (binding) {
-        to = key.slice(0, -7); // strip Binding off end
-        if (isStream(binding)) {
-          connectStreamBinding(obj, to, binding);
-          continue;
-        } else if (binding instanceof Binding) {
-          binding = binding.copy(); // copy prototypes' instance
-          binding.to(to);
-        } else { // binding is string path
-          binding = new Binding(to, binding);
-        }
-        binding.connect(obj);
-        obj[key] = binding;
+  m.forEachBindings((key, binding) => {
+    if (binding) {
+      let to = key.slice(0, -7); // strip Binding off end
+      if (isStream(binding)) {
+        connectStreamBinding(obj, to, binding);
+        return;
+      } else if (binding instanceof Binding) {
+        binding = binding.copy(); // copy prototypes' instance
+        binding.to(to);
+      } else { // binding is string path
+        binding = new Binding(to, binding);
       }
+      binding.connect(obj);
+      obj[key] = binding;
     }
-    // mark as applied
-    m.clearBindings();
-  }
+  });
+  // mark as applied
+  m.clearBindings();
 }
 
 function finishPartial(obj, m) {
@@ -386,7 +377,7 @@ function applyMixin(obj, mixins, partial) {
   // * Set up _super wrapping if necessary
   // * Set up computed property descriptors
   // * Copying `toString` in broken browsers
-  mergeMixins(mixins, mixinsMeta(obj), descs, values, obj, keys);
+  mergeMixins(mixins, metaFor(obj), descs, values, obj, keys);
 
   for (var i = 0, l = keys.length; i < l; i++) {
     key = keys[i];
@@ -558,9 +549,11 @@ MixinPrototype.reopen = function() {
 
   for (idx = 0; idx < len; idx++) {
     currentMixin = arguments[idx];
-    Ember.assert(`Expected hash or Mixin instance, got ${Object.prototype.toString.call(currentMixin)}`,
-                 typeof currentMixin === 'object' && currentMixin !== null &&
-                   Object.prototype.toString.call(currentMixin) !== '[object Array]');
+    assert(
+      `Expected hash or Mixin instance, got ${Object.prototype.toString.call(currentMixin)}`,
+      typeof currentMixin === 'object' && currentMixin !== null &&
+        Object.prototype.toString.call(currentMixin) !== '[object Array]'
+    );
 
     if (currentMixin instanceof Mixin) {
       mixins.push(currentMixin);
@@ -652,17 +645,13 @@ MixinPrototype.keys = function() {
 // TODO: Make Ember.mixin
 Mixin.mixins = function(obj) {
   var m = obj['__ember_meta__'];
-  var mixins = m && m.readableMixins();
   var ret = [];
+  if (!m) { return ret; }
 
-  if (!mixins) { return ret; }
-
-  for (var key in mixins) {
-    var currentMixin = mixins[key];
-
+  m.forEachMixins((key, currentMixin) => {
     // skip primitive mixins since these are always anonymous
     if (!currentMixin.properties) { ret.push(currentMixin); }
-  }
+  });
 
   return ret;
 };
@@ -678,7 +667,11 @@ REQUIRED.toString = function() { return '(Required Property)'; };
   @private
 */
 export function required() {
-  Ember.deprecate('Ember.required is deprecated as its behavior is inconsistent and unreliable.', false, { id: 'ember-metal.required', until: '3.0.0' });
+  deprecate(
+    'Ember.required is deprecated as its behavior is inconsistent and unreliable.',
+    false,
+    { id: 'ember-metal.required', until: '3.0.0' }
+  );
   return REQUIRED;
 }
 
@@ -709,7 +702,7 @@ Alias.prototype = new Descriptor();
   @method aliasMethod
   @for Ember
   @param {String} methodName name of the method to alias
-  @private
+  @public
 */
 export function aliasMethod(methodName) {
   return new Alias(methodName);
@@ -745,9 +738,9 @@ export function observer(...args) {
   var paths;
 
   var addWatchedProperty = function(path) {
-    Ember.assert(
+    assert(
       `Depending on arrays using a dependent key ending with \`@each\` is no longer supported. ` +
-        `Please refactor from \`Ember.observer('${path}', function() {});\` to \`Ember.observer('${path.slice(0, -6)}.[]', function() {})\`.`,
+      `Please refactor from \`Ember.observer('${path}', function() {});\` to \`Ember.observer('${path.slice(0, -6)}.[]', function() {})\`.`,
       path.slice(-5) !== '@each'
     );
 
@@ -757,7 +750,7 @@ export function observer(...args) {
 
   if (typeof func !== 'function') {
     // revert to old, soft-deprecated argument ordering
-    Ember.deprecate('Passing the dependentKeys after the callback function in Ember.observer is deprecated. Ensure the callback function is the last argument.', false, { id: 'ember-metal.observer-argument-order', until: '3.0.0' });
+    deprecate('Passing the dependentKeys after the callback function in Ember.observer is deprecated. Ensure the callback function is the last argument.', false, { id: 'ember-metal.observer-argument-order', until: '3.0.0' });
 
     func  = args[0];
     _paths = args.slice(1);
@@ -803,12 +796,14 @@ export function observer(...args) {
   @private
 */
 export function _immediateObserver() {
-  Ember.deprecate('Usage of `Ember.immediateObserver` is deprecated, use `Ember.observer` instead.', false, { id: 'ember-metal.immediate-observer', until: '3.0.0' });
+  deprecate('Usage of `Ember.immediateObserver` is deprecated, use `Ember.observer` instead.', false, { id: 'ember-metal.immediate-observer', until: '3.0.0' });
 
   for (var i = 0, l = arguments.length; i < l; i++) {
     var arg = arguments[i];
-    Ember.assert('Immediate observers must observe internal properties only, not properties on other objects.',
-                 typeof arg !== 'string' || arg.indexOf('.') === -1);
+    assert(
+      'Immediate observers must observe internal properties only, not properties on other objects.',
+      typeof arg !== 'string' || arg.indexOf('.') === -1
+    );
   }
 
   return observer.apply(this, arguments);

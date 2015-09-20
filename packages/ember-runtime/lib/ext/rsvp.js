@@ -1,6 +1,7 @@
 /* globals RSVP:true */
 
 import Ember from 'ember-metal/core';
+import { assert } from 'ember-metal/debug';
 import Logger from 'ember-metal/logger';
 import run from 'ember-metal/run_loop';
 import * as RSVP from 'rsvp';
@@ -31,22 +32,25 @@ RSVP.configure('async', function(callback, promise) {
   });
 });
 
-export function onerrorDefault(e) {
+export function onerrorDefault(reason) {
   var error;
 
-  if (e && e.errorThrown) {
+  if (reason && reason.errorThrown) {
     // jqXHR provides this
-    error = e.errorThrown;
+    error = reason.errorThrown;
     if (typeof error === 'string') {
       error = new Error(error);
     }
-    error.__reason_with_error_thrown__ = e;
+    Object.defineProperty(error, '__reason_with_error_thrown__', {
+      value: reason,
+      enumerable: false
+    });
   } else {
-    error = e;
+    error = reason;
   }
 
   if (error && error.name === "UnrecognizedURLError") {
-    Ember.assert("The URL '" + error.message + "' did not match any routes in your application", false);
+    assert("The URL '" + error.message + "' did not match any routes in your application", false);
     return;
   }
 

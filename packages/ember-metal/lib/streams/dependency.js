@@ -1,5 +1,5 @@
-import Ember from 'ember-metal/core';
-import merge from 'ember-metal/merge';
+import { assert } from 'ember-metal/debug';
+import assign from 'ember-metal/assign';
 import {
   read,
   setValue,
@@ -18,7 +18,7 @@ import {
   @constructor
 */
 function Dependency(depender, dependee) {
-  Ember.assert('Dependency error: Depender must be a stream', isStream(depender));
+  assert('Dependency error: Depender must be a stream', isStream(depender));
 
   this.next = null;
   this.prev = null;
@@ -27,9 +27,9 @@ function Dependency(depender, dependee) {
   this.unsubscription = null;
 }
 
-merge(Dependency.prototype, {
+assign(Dependency.prototype, {
   subscribe() {
-    Ember.assert('Dependency error: Dependency tried to subscribe while already subscribed', !this.unsubscription);
+    assert('Dependency error: Dependency tried to subscribe while already subscribed', !this.unsubscription);
 
     this.unsubscription = subscribe(this.dependee, this.depender.notify, this.depender);
   },
@@ -49,7 +49,9 @@ merge(Dependency.prototype, {
         this.unsubscribe();
         this.subscribe();
       }
+      return true;
     }
+    return false;
   },
 
   getValue() {

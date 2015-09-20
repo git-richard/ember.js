@@ -1,7 +1,6 @@
-import Ember from 'ember-metal/core';
+import { assert, deprecate } from 'ember-metal/debug';
 import { get } from 'ember-metal/property_get';
 import assign from 'ember-metal/assign';
-import { isGlobal } from 'ember-metal/path_cache';
 import { internal, render } from 'htmlbars-runtime';
 import getValue from 'ember-htmlbars/hooks/get-value';
 import { isStream } from 'ember-metal/streams/utils';
@@ -82,12 +81,12 @@ function mergeAttrs(innerAttrs, outerAttrs) {
 }
 
 function blockFor(template, options) {
-  Ember.assert('BUG: Must pass a template to blockFor', !!template);
+  assert('BUG: Must pass a template to blockFor', !!template);
   return internal.blockFor(render, template, options);
 }
 
 function createContentBlock(template, scope, self, component) {
-  Ember.assert('BUG: buildComponentTemplate can take a scope or a self, but not both', !(scope && self));
+  assert('BUG: buildComponentTemplate can take a scope or a self, but not both', !(scope && self));
 
   return blockFor(template, {
     scope,
@@ -139,9 +138,11 @@ function tagNameFor(view) {
 
   if (tagName !== null && typeof tagName === 'object' && tagName.isDescriptor) {
     tagName = get(view, 'tagName');
-    Ember.deprecate('In the future using a computed property to define tagName will not be permitted. That value will be respected, but changing it will not update the element.',
-                    !tagName,
-                    { id: 'ember-views.computed-tag-name', until: '2.0.0' });
+    deprecate(
+      'In the future using a computed property to define tagName will not be permitted. That value will be respected, but changing it will not update the element.',
+      !tagName,
+      { id: 'ember-views.computed-tag-name', until: '2.0.0' }
+    );
   }
 
   if (tagName === null || tagName === undefined) {
@@ -156,6 +157,7 @@ function tagNameFor(view) {
 function normalizeComponentAttributes(component, isAngleBracket, attrs) {
   var normalized = {};
   var attributeBindings = component.attributeBindings;
+  var streamBasePath = component.isComponent ? '' : 'view.';
   var i, l;
 
   if (attrs.id && getValue(attrs.id)) {
@@ -175,7 +177,7 @@ function normalizeComponentAttributes(component, isAngleBracket, attrs) {
       if (colonIndex !== -1) {
         var attrProperty = attr.substring(0, colonIndex);
         attrName = attr.substring(colonIndex + 1);
-        expression = ['get', 'view.' + attrProperty];
+        expression = ['get', `${streamBasePath}${attrProperty}`];
       } else if (attrs[attr]) {
         // TODO: For compatibility with 1.x, we probably need to `set`
         // the component's attribute here if it is a CP, but we also
@@ -185,10 +187,10 @@ function normalizeComponentAttributes(component, isAngleBracket, attrs) {
         expression = ['value', attrs[attr]];
       } else {
         attrName = attr;
-        expression = ['get', 'view.' + attr];
+        expression = ['get', `${streamBasePath}${attr}`];
       }
 
-      Ember.assert('You cannot use class as an attributeBinding, use classNameBindings instead.', attrName !== 'class');
+      assert('You cannot use class as an attributeBinding, use classNameBindings instead.', attrName !== 'class');
 
       normalized[attrName] = expression;
     }
@@ -209,7 +211,7 @@ function normalizeComponentAttributes(component, isAngleBracket, attrs) {
     component.tagName = attrs.tagName;
   }
 
-  var normalizedClass = normalizeClass(component, attrs);
+  var normalizedClass = normalizeClass(component, attrs, streamBasePath);
 
   if (normalizedClass) {
     normalized.class = normalizedClass;
@@ -229,7 +231,7 @@ function normalizeComponentAttributes(component, isAngleBracket, attrs) {
   return normalized;
 }
 
-function normalizeClass(component, attrs) {
+function normalizeClass(component, attrs, streamBasePath) {
   var i, l;
   var normalizedClass = [];
   var classNames = get(component, 'classNames');
@@ -244,11 +246,7 @@ function normalizeClass(component, attrs) {
   }
 
   if (attrs.classBinding) {
-    normalizeClasses(attrs.classBinding.split(' '), normalizedClass);
-  }
-
-  if (attrs.classNames) {
-    normalizedClass.push(['value', attrs.classNames]);
+    normalizeClasses(attrs.classBinding.split(' '), normalizedClass, streamBasePath);
   }
 
   if (classNames) {
@@ -258,7 +256,7 @@ function normalizeClass(component, attrs) {
   }
 
   if (classNameBindings) {
-    normalizeClasses(classNameBindings, normalizedClass);
+    normalizeClasses(classNameBindings, normalizedClass, streamBasePath);
   }
 
   if (normalizeClass.length) {
@@ -266,12 +264,12 @@ function normalizeClass(component, attrs) {
   }
 }
 
-function normalizeClasses(classes, output) {
+function normalizeClasses(classes, output, streamBasePath) {
   var i, l;
 
   for (i = 0, l = classes.length; i < l; i++) {
     var className = classes[i];
-    Ember.assert('classNameBindings must not have spaces in them. Multiple class name bindings can be provided as elements of an array, e.g. [\'foo\', \':bar\']', className.indexOf(' ') === -1);
+    assert('classNameBindings must not have spaces in them. Multiple class name bindings can be provided as elements of an array, e.g. [\'foo\', \':bar\']', className.indexOf(' ') === -1);
 
     var [propName, activeClass, inactiveClass] = className.split(':');
 
@@ -281,8 +279,7 @@ function normalizeClasses(classes, output) {
       continue;
     }
 
-    // 2.0TODO: Remove deprecated global path
-    var prop = isGlobal(propName) ? propName : 'view.' + propName;
+    var prop = `${streamBasePath}${propName}`;
 
     output.push(['subexpr', '-normalize-class', [
       // params
@@ -297,7 +294,7 @@ function normalizeClasses(classes, output) {
 }
 
 function validateTaglessComponent(component) {
-  Ember.assert('You cannot use `classNameBindings` on a tag-less component: ' + component.toString(), function() {
+  assert('You cannot use `classNameBindings` on a tag-less component: ' + component.toString(), function() {
     var classNameBindings = component.classNameBindings;
     return !classNameBindings || classNameBindings.length === 0;
   });

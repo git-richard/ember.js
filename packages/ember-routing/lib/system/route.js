@@ -1,4 +1,5 @@
 import Ember from 'ember-metal/core'; // FEATURES, A, deprecate, assert, Logger
+import { assert, deprecate, info } from 'ember-metal/debug';
 import isEnabled from 'ember-metal/features';
 import EmberError from 'ember-metal/error';
 import { get } from 'ember-metal/property_get';
@@ -6,7 +7,7 @@ import { set } from 'ember-metal/property_set';
 import getProperties from 'ember-metal/get_properties';
 import isNone from 'ember-metal/is_none';
 import { computed } from 'ember-metal/computed';
-import merge from 'ember-metal/merge';
+import assign from 'ember-metal/assign';
 import {
   typeOf
 } from 'ember-runtime/utils';
@@ -132,7 +133,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
 
       if (isEnabled('ember-routing-route-configured-query-params')) {
         if (controllerDefinedQueryParameterConfiguration.length) {
-          Ember.deprecate(`Configuring query parameters on a controller is deprecated. Migrate the query parameters configuration from the '${controllerName}' controller to the '${this.routeName}' route: ${combinedQueryParameterConfiguration}`, false, { id: 'ember-routing.controller-configured-query-params', until: '3.0.0' });
+          deprecate(`Configuring query parameters on a controller is deprecated. Migrate the query parameters configuration from the '${controllerName}' controller to the '${this.routeName}' route: ${combinedQueryParameterConfiguration}`, false, { id: 'ember-routing.controller-configured-query-params', until: '3.0.0' });
         }
       }
     } else if (hasRouterDefinedQueryParams) {
@@ -329,8 +330,8 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     var state = transition ? transition.state : this.router.router.state;
 
     var params = {};
-    merge(params, state.params[name]);
-    merge(params, getQueryParamsFor(route, state));
+    assign(params, state.params[name]);
+    assign(params, getQueryParamsFor(route, state));
 
     return params;
   },
@@ -1528,12 +1529,12 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
       find(name, value) {
         var modelClass = container.lookupFactory(`model:${name}`);
 
-        Ember.assert(
+        assert(
           `You used the dynamic segment ${name}_id in your route ${routeName}, but ${namespace}.${classify(name)} did not exist and you did not override your route's \`model\` hook.`, !!modelClass);
 
         if (!modelClass) { return; }
 
-        Ember.assert(`${classify(name)} has no method \`find\`.`, typeof modelClass.find === 'function');
+        assert(`${classify(name)} has no method \`find\`.`, typeof modelClass.find === 'function');
 
         return modelClass.find(value);
       }
@@ -1698,7 +1699,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     // NOTE: We're specifically checking that skipAssert is true, because according
     //   to the old API the second parameter was model. We do not want people who
     //   passed a model to skip the assertion.
-    Ember.assert(`The controller named '${name}' could not be found. Make sure that this route exists and has already been entered at least once. If you are accessing a controller not associated with a route, make sure the controller class is explicitly defined.`, controller || _skipAssert === true);
+    assert(`The controller named '${name}' could not be found. Make sure that this route exists and has already been entered at least once. If you are accessing a controller not associated with a route, make sure the controller class is explicitly defined.`, controller || _skipAssert === true);
 
     return controller;
   },
@@ -1932,7 +1933,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     @public
   */
   render(_name, options) {
-    Ember.assert('The name in the given arguments is undefined', arguments.length > 0 ? !isNone(arguments[0]) : true);
+    assert('The name in the given arguments is undefined', arguments.length > 0 ? !isNone(arguments[0]) : true);
 
     var namePassed = typeof _name === 'string' && !!_name;
     var isDefaultRender = arguments.length === 0 || Ember.isEmpty(arguments[0]);
@@ -2157,10 +2158,10 @@ function buildRenderOptions(route, namePassed, isDefaultRender, name, options) {
   }
 
   if (!ViewClass && !template && !Component) {
-    Ember.assert(`Could not find "${name}" template, view, or component.`, isDefaultRender);
+    assert(`Could not find "${name}" template, view, or component.`, isDefaultRender);
     if (LOG_VIEW_LOOKUPS) {
       var fullName = `template:${name}`;
-      Ember.Logger.info(`Could not find "${name}" template or view. Nothing will be rendered`, { fullName: fullName });
+      info(`Could not find "${name}" template or view. Nothing will be rendered`, { fullName: fullName });
     }
   }
 
@@ -2171,7 +2172,7 @@ function getFullQueryParams(router, state) {
   if (state.fullQueryParams) { return state.fullQueryParams; }
 
   state.fullQueryParams = {};
-  merge(state.fullQueryParams, state.queryParams);
+  assign(state.fullQueryParams, state.queryParams);
 
   var targetRouteName = state.handlerInfos[state.handlerInfos.length - 1].name;
   router._deserializeQueryParams(targetRouteName, state.fullQueryParams);
@@ -2237,8 +2238,8 @@ function mergeEachQueryParams(controllerQP, routeQP) {
     if (!controllerQP.hasOwnProperty(cqpName)) { continue; }
 
     var newControllerParameterConfiguration = {};
-    merge(newControllerParameterConfiguration, controllerQP[cqpName]);
-    merge(newControllerParameterConfiguration, routeQP[cqpName]);
+    assign(newControllerParameterConfiguration, controllerQP[cqpName]);
+    assign(newControllerParameterConfiguration, routeQP[cqpName]);
 
     qps[cqpName] = newControllerParameterConfiguration;
 
@@ -2252,7 +2253,7 @@ function mergeEachQueryParams(controllerQP, routeQP) {
     if (!routeQP.hasOwnProperty(rqpName) || keysAlreadyMergedOrSkippable[rqpName]) { continue; }
 
     var newRouteParameterConfiguration = {};
-    merge(newRouteParameterConfiguration, routeQP[rqpName], controllerQP[rqpName]);
+    assign(newRouteParameterConfiguration, routeQP[rqpName], controllerQP[rqpName]);
     qps[rqpName] = newRouteParameterConfiguration;
   }
 
@@ -2266,7 +2267,7 @@ function addQueryParamsObservers(controller, propNames) {
 }
 
 function deprecateQueryParamDefaultValuesSetOnController(controllerName, routeName, propName) {
-  Ember.deprecate(`Configuring query parameter default values on controllers is deprecated. Please move the value for the property '${propName}' from the '${controllerName}' controller to the '${routeName}' route in the format: {queryParams: ${propName}: {defaultValue: <default value> }}`, false, { id: 'ember-routing.deprecate-query-param-default-values-set-on-controller', until: '3.0.0' });
+  deprecate(`Configuring query parameter default values on controllers is deprecated. Please move the value for the property '${propName}' from the '${controllerName}' controller to the '${routeName}' route in the format: {queryParams: ${propName}: {defaultValue: <default value> }}`, false, { id: 'ember-routing.deprecate-query-param-default-values-set-on-controller', until: '3.0.0' });
 }
 
 export default Route;

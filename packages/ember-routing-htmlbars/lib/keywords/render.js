@@ -3,7 +3,7 @@
 @submodule ember-templates
 */
 
-import Ember from 'ember-metal/core'; // assert
+import { assert } from 'ember-metal/debug';
 import { get } from 'ember-metal/property_get';
 import EmptyObject from 'ember-metal/empty_object';
 import EmberError from 'ember-metal/error';
@@ -91,7 +91,7 @@ export default {
   setupState(prevState, env, scope, params, hash) {
     var name = params[0];
 
-    Ember.assert(
+    assert(
       'The first argument of {{render}} must be quoted, e.g. {{render "sidebar"}}.',
       typeof name === 'string'
     );
@@ -117,7 +117,7 @@ export default {
   },
 
   render(node, env, scope, params, hash, template, inverse, visitor) {
-    var state = node.state;
+    var state = node.getState();
     var name = params[0];
     var context = params[1];
 
@@ -130,14 +130,14 @@ export default {
     //
     var router = container.lookup('router:main');
 
-    Ember.assert(
+    assert(
       'The second argument of {{render}} must be a path, e.g. {{render "post" post}}.',
       params.length < 2 || isStream(params[1])
     );
 
     if (params.length === 1) {
       // use the singleton controller
-      Ember.assert(
+      assert(
         'You can only use the {{render}} helper once without a model object as ' +
         'its second argument, as in {{render "post" post}}.',
         !router || !router._lookupActiveComponentNode(name)
@@ -147,7 +147,7 @@ export default {
     }
 
     var templateName = 'template:' + name;
-    Ember.assert(
+    assert(
       'You used `{{render \'' + name + '\'}}`, but \'' + name + '\' can not be ' +
       'found as either a template or a view.',
       container.registry.has('view:' + name) || container.registry.has(templateName) || !!template
@@ -175,7 +175,7 @@ export default {
       controllerFullName = 'controller:' + controllerName;
       delete hash.controller;
 
-      Ember.assert(
+      assert(
         'The controller name you supplied \'' + controllerName + '\' ' +
         'did not resolve to a controller.',
         container.registry.has(controllerFullName)
@@ -185,7 +185,7 @@ export default {
       controllerFullName = 'controller:' + controllerName;
     }
 
-    var parentController = read(scope.locals.controller);
+    var parentController = read(scope.getLocal('controller'));
     var controller;
 
     // choose name
@@ -217,8 +217,6 @@ export default {
 
     hash.viewName = camelize(name);
 
-    // var state = node.state;
-    // var parentView = scope.view;
     if (template && template.raw) {
       template = template.raw;
     }
@@ -244,7 +242,7 @@ export default {
 
   rerender(node, env, scope, params, hash, template, inverse, visitor) {
     var model = read(params[1]);
-    node.state.controller.set('model', model);
+    node.getState().controller.set('model', model);
   }
 };
 

@@ -5,7 +5,9 @@
 
 // BEGIN IMPORTS
 import Ember from 'ember-metal/core';
+import { deprecateFunc } from 'ember-metal/debug';
 import isEnabled, { FEATURES } from 'ember-metal/features';
+import assign from 'ember-metal/assign';
 import merge from 'ember-metal/merge';
 import {
   instrument,
@@ -320,7 +322,12 @@ Ember.isEmpty = isEmpty;
 Ember.isBlank = isBlank;
 Ember.isPresent = isPresent;
 
-Ember.merge = merge;
+if (isEnabled('ember-metal-ember-assign')) {
+  Ember.assign = Object.assign || assign;
+  Ember.merge = merge;
+} else {
+  Ember.merge = merge;
+}
 
 Ember.FEATURES = FEATURES;
 Ember.FEATURES.isEnabled = isEnabled;
@@ -363,7 +370,7 @@ if (Ember.__loader.registry['ember-debug']) {
   }
 }
 
-Ember.create = Ember.deprecateFunc('Ember.create is deprecated in favor of Object.create', { id: 'ember-metal.ember-create', until: '3.0.0' }, Object.create);
-Ember.keys = Ember.deprecateFunc('Ember.keys is deprecated in favor of Object.keys', { id: 'ember-metal.ember.keys', until: '3.0.0' }, Object.keys);
+Ember.create = deprecateFunc('Ember.create is deprecated in favor of Object.create', { id: 'ember-metal.ember-create', until: '3.0.0' }, Object.create);
+Ember.keys = deprecateFunc('Ember.keys is deprecated in favor of Object.keys', { id: 'ember-metal.ember.keys', until: '3.0.0' }, Object.keys);
 
 export default Ember;

@@ -385,6 +385,29 @@ QUnit.test('dynamic named positional parameters', function() {
   equal(jQuery('#qunit-fixture').text(), 'Edward5');
 });
 
+QUnit.test('if a value is passed as a non-positional parameter, it takes precedence over the named one', function() {
+  var SampleComponent = Component.extend();
+  SampleComponent.reopenClass({
+    positionalParams: ['name']
+  });
+
+  registry.register('template:components/sample-component', compile('{{attrs.name}}'));
+  registry.register('component:sample-component', SampleComponent);
+
+  view = EmberView.extend({
+    layout: compile('{{sample-component notMyName name=myName}}'),
+    container: container,
+    context: {
+      myName: 'Quint',
+      notMyName: 'Sergio'
+    }
+  }).create();
+
+  expectAssertion(function() {
+    runAppend(view);
+  }, `You cannot specify both a positional param (at position 0) and the hash argument \`name\`.`);
+});
+
 QUnit.test('static arbitrary number of positional parameters', function() {
   var SampleComponent = Component.extend();
   SampleComponent.reopenClass({
@@ -404,6 +427,28 @@ QUnit.test('static arbitrary number of positional parameters', function() {
   equal(view.$('#args-3').text(), 'Foo4Bar');
   equal(view.$('#args-5').text(), 'Foo4Bar5Baz');
   equal(view.$('#helper').text(), 'Foo4Bar5Baz');
+});
+
+QUnit.test('arbitrary positional parameter conflict with hash parameter is reported', function() {
+  var SampleComponent = Component.extend();
+  SampleComponent.reopenClass({
+    positionalParams: 'names'
+  });
+
+  registry.register('template:components/sample-component', compile('{{#each attrs.names as |name|}}{{name}}{{/each}}'));
+  registry.register('component:sample-component', SampleComponent);
+
+  view = EmberView.extend({
+    layout: compile('{{sample-component "Foo" 4 "Bar" names=numbers id="args-3"}}'),
+    container: container,
+    context: {
+      numbers: [1, 2, 3]
+    }
+  }).create();
+
+  expectAssertion(function() {
+    runAppend(view);
+  }, `You cannot specify positional parameters and the hash argument \`names\`.`);
 });
 
 QUnit.test('dynamic arbitrary number of positional parameters', function() {
@@ -786,13 +831,15 @@ QUnit.test('non-block with each rendering child components', function() {
 });
 
 QUnit.test('specifying classNames results in correct class', function(assert) {
-  expect(1);
+  expect(3);
 
+  let clickyThing;
   registry.register('component:some-clicky-thing', Component.extend({
     tagName: 'button',
     classNames: ['foo', 'bar'],
-    click() {
-      assert.ok(true, 'click was fired!');
+    init() {
+      this._super(...arguments);
+      clickyThing = this;
     }
   }));
 
@@ -805,6 +852,12 @@ QUnit.test('specifying classNames results in correct class', function(assert) {
 
   let button = view.$('button');
   ok(button.is('.foo.bar.baz.ember-view'), 'the element has the correct classes: ' + button.attr('class'));
+
+  let expectedClassNames = ['ember-view', 'foo', 'bar', 'baz'];
+  assert.deepEqual(clickyThing.get('classNames'),  expectedClassNames, 'classNames are properly combined');
+
+  let buttonClassNames = button.attr('class');
+  assert.deepEqual(buttonClassNames.split(' '), expectedClassNames, 'all classes are set 1:1 in DOM');
 });
 
 QUnit.test('specifying custom concatenatedProperties avoids clobbering', function(assert) {
@@ -1310,4 +1363,3 @@ function equalsElement(element, tagName, attributes, content) {
 
   QUnit.push(element.innerHTML === content, element.innerHTML, content, `The element had '${content}' as its content`);
 }
-

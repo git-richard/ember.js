@@ -1,13 +1,12 @@
+'no use strict';
 // Remove "use strict"; from transpiled module until
 // https://bugs.webkit.org/show_bug.cgi?id=138038 is fixed
-//
-'REMOVE_USE_STRICT: true';
 
 /**
 @module ember
 @submodule ember-metal
 */
-import Ember from 'ember-metal/core';
+import { assert } from 'ember-metal/debug';
 import {
   apply,
   applyStr
@@ -83,7 +82,7 @@ export function accumulateListeners(obj, eventName, otherActions) {
   @public
 */
 export function addListener(obj, eventName, target, method, once) {
-  Ember.assert('You must pass at least an object and event name to Ember.addListener', !!obj && !!eventName);
+  assert('You must pass at least an object and event name to Ember.addListener', !!obj && !!eventName);
 
   if (!method && 'function' === typeof target) {
     method = target;
@@ -116,7 +115,7 @@ export function addListener(obj, eventName, target, method, once) {
   @public
 */
 export function removeListener(obj, eventName, target, method) {
-  Ember.assert('You must pass at least an object and event name to Ember.removeListener', !!obj && !!eventName);
+  assert('You must pass at least an object and event name to Ember.removeListener', !!obj && !!eventName);
 
   if (!method && 'function' === typeof target) {
     method = target;

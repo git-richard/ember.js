@@ -1,4 +1,5 @@
-import Ember from 'ember-metal/core'; // Ember.assert, Ember.Handlebars
+import Ember from 'ember-metal/core';
+import { assert, deprecate } from 'ember-metal/debug';
 
 import TargetActionSupport from 'ember-runtime/mixins/target_action_support';
 import View from 'ember-views/views/view';
@@ -15,9 +16,11 @@ function validateAction(component, actionName) {
   if (actionName && actionName[MUTABLE_CELL]) {
     actionName = actionName.value;
   }
-  Ember.assert('The default action was triggered on the component ' + component.toString() +
-               ', but the action name (' + actionName + ') was not a string.',
-               isNone(actionName) || typeof actionName === 'string' || typeof actionName === 'function');
+  assert(
+    'The default action was triggered on the component ' + component.toString() +
+    ', but the action name (' + actionName + ') was not a string.',
+    isNone(actionName) || typeof actionName === 'string' || typeof actionName === 'function'
+  );
   return actionName;
 }
 
@@ -129,12 +132,33 @@ var Component = View.extend(TargetActionSupport, {
   }),
 
   init() {
-    this._super.apply(this, arguments);
+    this._super(...arguments);
     set(this, 'controller', this);
     set(this, 'context', this);
+
+    if (!this.layout && this.layoutName && this.container) {
+      let layoutName = get(this, 'layoutName');
+
+      this.layout = this.templateForName(layoutName);
+    }
+
+    // If a `defaultLayout` was specified move it to the `layout` prop.
+    // `layout` is no longer a CP, so this just ensures that the `defaultLayout`
+    // logic is supported with a deprecation
+    if (this.defaultLayout && !this.layout) {
+      deprecate(
+        `Specifying \`defaultLayout\` to ${this} is deprecated. Please use \`layout\` instead.`,
+        false,
+        { id: 'ember-views.component.defaultLayout', until: '3.0.0' }
+      );
+
+      this.layout = this.defaultLayout;
+    }
   },
 
   template: null,
+  layoutName: null,
+  layout: null,
 
   /**
     If the component is currently inserted into the DOM of a parent view, this
@@ -265,8 +289,11 @@ var Component = View.extend(TargetActionSupport, {
     }
 
     if (target = get(this, 'target')) {
-      Ember.assert('The `target` for ' + this + ' (' + target +
-                   ') does not have a `send` method', typeof target.send === 'function');
+      assert(
+        'The `target` for ' + this + ' (' + target +
+        ') does not have a `send` method',
+        typeof target.send === 'function'
+      );
       target.send(...arguments);
     } else {
       if (!hasAction) {
@@ -350,6 +377,58 @@ var Component = View.extend(TargetActionSupport, {
     @public
     @property hasBlockParams
     @returns Boolean
+  */
+
+  /**
+    Enables components to take a list of parameters as arguments
+
+    For example a component that takes two parameters with the names
+    `name` and `age`:
+
+    ```javascript
+    let MyComponent = Ember.Component.extend;
+    MyComponent.reopenClass({
+      positionalParams: ['name', 'age']
+    });
+    ```
+
+    It can then be invoked like this:
+
+    ```hbs
+    {{my-component "John" 38}}
+    ```
+
+    The parameters can be refered to just like named parameters:
+
+    ```hbs
+    Name: {{attrs.name}}, Age: {{attrs.age}}.
+    ```
+
+    Using a string instead of an array allows for an arbitrary number of
+    parameters:
+
+    ```javascript
+    let MyComponent = Ember.Component.extend;
+    MyComponent.reopenClass({
+      positionalParams: 'names'
+    });
+    ```
+
+    It can then be invoked like this:
+
+    ```hbs
+    {{my-component "John" "Michael" "Scott"}}
+    ```
+
+    The parameters can then be refered to by enumerating over the list:
+
+    ```hbs
+    {{#each attrs.names as |name|}}{{name}}{{/each}}
+    ```
+
+    @static
+    @public
+    @property positionalParams
   */
 });
 

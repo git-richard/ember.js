@@ -3,7 +3,8 @@
 @submodule ember-runtime
 */
 
-import Ember from 'ember-metal/core'; // Ember.assert
+import Ember from 'ember-metal/core';
+import { assert } from 'ember-metal/debug';
 import { get } from 'ember-metal/property_get';
 import EmberError from 'ember-metal/error';
 import { ComputedProperty, computed } from 'ember-metal/computed';
@@ -215,8 +216,11 @@ export function map(dependentKey, callback) {
   @public
 */
 export function mapBy(dependentKey, propertyKey) {
-  Ember.assert('Ember.computed.mapBy expects a property string for its second argument, ' +
-    'perhaps you meant to use "map"', typeof propertyKey === 'string');
+  assert(
+    'Ember.computed.mapBy expects a property string for its second argument, ' +
+    'perhaps you meant to use "map"',
+    typeof propertyKey === 'string'
+  );
 
   return map(`${dependentKey}.@each.${propertyKey}`, item => get(item, propertyKey));
 }
@@ -537,8 +541,11 @@ export function setDiff(setAProperty, setBProperty) {
   @public
 */
 export function sort(itemsKey, sortDefinition) {
-  Ember.assert('Ember.computed.sort requires two arguments: an array key to sort and ' +
-    'either a sort properties key or sort function', arguments.length === 2);
+  assert(
+    'Ember.computed.sort requires two arguments: an array key to sort and ' +
+    'either a sort properties key or sort function',
+    arguments.length === 2
+  );
 
   if (typeof sortDefinition === 'function') {
     return customSort(itemsKey, sortDefinition);
@@ -563,6 +570,8 @@ function propertySort(itemsKey, sortPropertiesKey) {
 
     var items = itemsKey === '@this' ? this : get(this, itemsKey);
     var sortProperties = get(this, sortPropertiesKey);
+
+    if (items === null || typeof items !== 'object') { return Ember.A(); }
 
     // TODO: Ideally we'd only do this if things have changed
     if (cp._sortPropObservers) {

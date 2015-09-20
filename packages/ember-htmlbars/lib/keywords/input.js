@@ -2,7 +2,7 @@
 @module ember
 @submodule ember-templates
 */
-import Ember from 'ember-metal/core';
+import { assert } from 'ember-metal/debug';
 import assign from 'ember-metal/assign';
 
 /**
@@ -156,14 +156,17 @@ export default {
     var type = env.hooks.getValue(hash.type);
     var componentName = componentNameMap[type] || defaultComponentName;
 
-    Ember.assert('{{input type=\'checkbox\'}} does not support setting `value=someBooleanValue`;' +
-                 ' you must use `checked=someBooleanValue` instead.', !(type === 'checkbox' && hash.hasOwnProperty('value')));
+    assert(
+      '{{input type=\'checkbox\'}} does not support setting `value=someBooleanValue`; ' +
+      'you must use `checked=someBooleanValue` instead.',
+      !(type === 'checkbox' && hash.hasOwnProperty('value'))
+    );
 
     return assign({}, lastState, { componentName });
   },
 
   render(morph, env, scope, params, hash, template, inverse, visitor) {
-    env.hooks.component(morph, env, scope, morph.state.componentName, params, hash, { default: template, inverse }, visitor);
+    env.hooks.component(morph, env, scope, morph.getState().componentName, params, hash, { default: template, inverse }, visitor);
   },
 
   rerender(...args) {
