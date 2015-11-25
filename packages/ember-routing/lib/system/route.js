@@ -17,6 +17,7 @@ import {
   classify
 } from 'ember-runtime/system/string';
 import EmberObject from 'ember-runtime/system/object';
+import { A as emberA } from 'ember-runtime/system/native_array';
 import Evented from 'ember-runtime/mixins/evented';
 import ActionHandler, { deprecateUnderscoreActions } from 'ember-runtime/mixins/action_handler';
 import generateController from 'ember-routing/system/generate_controller';
@@ -28,7 +29,8 @@ import {
   normalizeControllerQueryParams,
   calculateCacheKey
 } from 'ember-routing/utils';
-
+import { getOwner } from 'container/owner';
+import isEmpty from 'ember-metal/is_empty';
 var slice = Array.prototype.slice;
 
 function K() { return this; }
@@ -116,7 +118,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     var controllerProto, combinedQueryParameterConfiguration;
 
     var controllerName = this.controllerName || this.routeName;
-    var definedControllerClass = this.container.lookupFactory(`controller:${controllerName}`);
+    var definedControllerClass = getOwner(this)._lookupFactory(`controller:${controllerName}`);
     var queryParameterConfiguraton = get(this, 'queryParams');
     var hasRouterDefinedQueryParams = !!Object.keys(queryParameterConfiguraton).length;
 
@@ -139,7 +141,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     } else if (hasRouterDefinedQueryParams) {
       // the developer has not defined a controller but *has* supplied route query params.
       // Generate a class for them so we can later insert default values
-      var generatedControllerClass = generateControllerFactory(this.container, controllerName);
+      var generatedControllerClass = generateControllerFactory(getOwner(this), controllerName);
       controllerProto = generatedControllerClass.proto();
       combinedQueryParameterConfiguration = queryParameterConfiguraton;
     }
@@ -184,7 +186,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
       var defaultValue = get(controllerProto, propName);
 
       if (Array.isArray(defaultValue)) {
-        defaultValue = Ember.A(defaultValue.slice());
+        defaultValue = emberA(defaultValue.slice());
       }
 
       var type = desc.type || typeOf(defaultValue);
@@ -320,7 +322,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     @public
   */
   paramsFor(name) {
-    var route = this.container.lookup(`route:${name}`);
+    var route = getOwner(this).lookup(`route:${name}`);
 
     if (!route) {
       return {};
@@ -387,7 +389,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     } else if (defaultValueType === 'number') {
       return (Number(value)).valueOf();
     } else if (defaultValueType === 'array') {
-      return Ember.A(JSON.parse(value));
+      return emberA(JSON.parse(value));
     }
     return value;
   },
@@ -1213,7 +1215,13 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
 
     this.setupController(controller, context, transition);
 
-    this.renderTemplate(controller, context);
+    if (isEnabled('ember-application-visit')) {
+      if (!this._environment || this._environment.options.shouldRender) {
+        this.renderTemplate(controller, context);
+      }
+    } else {
+      this.renderTemplate(controller, context);
+    }
   },
 
   /*
@@ -1521,13 +1529,13 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     @private
   */
   store: computed(function() {
-    var container = this.container;
+    var owner = getOwner(this);
     var routeName = this.routeName;
     var namespace = get(this, 'router.namespace');
 
     return {
       find(name, value) {
-        var modelClass = container.lookupFactory(`model:${name}`);
+        var modelClass = owner._lookupFactory(`model:${name}`);
 
         assert(
           `You used the dynamic segment ${name}_id in your route ${routeName}, but ${namespace}.${classify(name)} did not exist and you did not override your route's \`model\` hook.`, !!modelClass);
@@ -1686,15 +1694,15 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     @public
   */
   controllerFor(name, _skipAssert) {
-    var container = this.container;
-    var route = container.lookup(`route:${name}`);
+    var owner = getOwner(this);
+    var route = owner.lookup(`route:${name}`);
     var controller;
 
     if (route && route.controllerName) {
       name = route.controllerName;
     }
 
-    controller = container.lookup(`controller:${name}`);
+    controller = owner.lookup(`controller:${name}`);
 
     // NOTE: We're specifically checking that skipAssert is true, because according
     //   to the old API the second parameter was model. We do not want people who
@@ -1724,11 +1732,11 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     @private
   */
   generateController(name, model) {
-    var container = this.container;
+    var owner = getOwner(this);
 
     model = model || this.modelFor(name);
 
-    return generateController(container, name, model);
+    return generateController(owner, name, model);
   },
 
   /**
@@ -1763,7 +1771,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     @public
   */
   modelFor(name) {
-    var route = this.container.lookup(`route:${name}`);
+    var route = getOwner(this).lookup(`route:${name}`);
     var transition = this.router ? this.router.router.activeTransition : null;
 
     // If we are mid-transition, we want to try and look up
@@ -1936,7 +1944,7 @@ var Route = EmberObject.extend(ActionHandler, Evented, {
     assert('The name in the given arguments is undefined', arguments.length > 0 ? !isNone(arguments[0]) : true);
 
     var namePassed = typeof _name === 'string' && !!_name;
-    var isDefaultRender = arguments.length === 0 || Ember.isEmpty(arguments[0]);
+    var isDefaultRender = arguments.length === 0 || isEmpty(arguments[0]);
     var name;
 
     if (typeof _name === 'object' && !options) {
@@ -2104,15 +2112,15 @@ function buildRenderOptions(route, namePassed, isDefaultRender, name, options) {
 
   if (!controller) {
     if (namePassed) {
-      controller = route.container.lookup(`controller:${name}`) || route.controllerName || route.routeName;
+      controller = getOwner(route).lookup(`controller:${name}`) || route.controllerName || route.routeName;
     } else {
-      controller = route.controllerName || route.container.lookup(`controller:${name}`);
+      controller = route.controllerName || getOwner(route).lookup(`controller:${name}`);
     }
   }
 
   if (typeof controller === 'string') {
     var controllerName = controller;
-    controller = route.container.lookup(`controller:${controllerName}`);
+    controller = getOwner(route).lookup(`controller:${controllerName}`);
     if (!controller) {
       throw new EmberError(`You passed \`controller: '${controllerName}'\` into the \`render\` method, but no such controller could be found.`);
     }
@@ -2126,9 +2134,10 @@ function buildRenderOptions(route, namePassed, isDefaultRender, name, options) {
     controller.set('model', options.model);
   }
 
+  let owner = getOwner(route);
   viewName = options && options.view || namePassed && name || route.viewName || name;
-  ViewClass = route.container.lookupFactory(`view:${viewName}`);
-  template = route.container.lookup(`template:${templateName}`);
+  ViewClass = owner._lookupFactory(`view:${viewName}`);
+  template = owner.lookup(`template:${templateName}`);
 
   var parent;
   if (into && (parent = parentRoute(route)) && into === parentRoute(route).routeName) {
@@ -2147,7 +2156,7 @@ function buildRenderOptions(route, namePassed, isDefaultRender, name, options) {
   let Component;
   if (isEnabled('ember-routing-routable-components')) {
     let componentName = options && options.component || namePassed && name || route.componentName || name;
-    let componentLookup = route.container.lookup('component-lookup:main');
+    let componentLookup = owner.lookup('component-lookup:main');
     Component = componentLookup.lookupFactory(componentName);
     let isGlimmerComponent = Component && Component.proto().isGlimmerComponent;
     if (!template && !ViewClass && Component && isGlimmerComponent) {
@@ -2207,7 +2216,7 @@ function getQueryParamsFor(route, state) {
 
 function copyDefaultValue(value) {
   if (Array.isArray(value)) {
-    return Ember.A(value.slice());
+    return emberA(value.slice());
   }
   return value;
 }

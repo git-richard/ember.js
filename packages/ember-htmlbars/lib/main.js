@@ -124,9 +124,14 @@ import joinClassesHelper from 'ember-htmlbars/helpers/-join-classes';
 import legacyEachWithControllerHelper from 'ember-htmlbars/helpers/-legacy-each-with-controller';
 import legacyEachWithKeywordHelper from 'ember-htmlbars/helpers/-legacy-each-with-keyword';
 import htmlSafeHelper from 'ember-htmlbars/helpers/-html-safe';
+import hashHelper from 'ember-htmlbars/helpers/hash';
 import DOMHelper from 'ember-htmlbars/system/dom-helper';
 import Helper, { helper as makeHelper } from 'ember-htmlbars/helper';
 import GlimmerComponent from 'ember-htmlbars/glimmer-component';
+import {
+  getTemplates,
+  setTemplates
+} from 'ember-htmlbars/template_registry';
 
 // importing adds template bootstrapping
 // initializer to enable embedded templates
@@ -148,6 +153,10 @@ registerHelper('concat', concatHelper);
 registerHelper('-join-classes', joinClassesHelper);
 registerHelper('-html-safe', htmlSafeHelper);
 
+if (isEnabled('ember-contextual-components')) {
+  registerHelper('hash', hashHelper);
+}
+
 if (Ember.ENV._ENABLE_LEGACY_VIEW_SUPPORT) {
   registerHelper('-legacy-each-with-controller', legacyEachWithControllerHelper);
   registerHelper('-legacy-each-with-keyword', legacyEachWithKeywordHelper);
@@ -168,3 +177,20 @@ if (isEnabled('ember-htmlbars-component-generation')) {
 
 Helper.helper = makeHelper;
 Ember.Helper = Helper;
+
+/**
+  Global hash of shared templates. This will automatically be populated
+  by the build tools so that you can store your Handlebars templates in
+  separate files that get loaded into JavaScript at buildtime.
+
+  @property TEMPLATES
+  @for Ember
+  @type Object
+  @private
+*/
+Object.defineProperty(Ember, 'TEMPLATES', {
+  configurable: false,
+  get: getTemplates,
+  set: setTemplates
+});
+

@@ -2,7 +2,7 @@
 // Ember.ContainerView circular dependency
 // Ember.ENV
 import Ember from 'ember-metal/core';
-import { deprecate, warn } from 'ember-metal/debug';
+import { deprecate } from 'ember-metal/debug';
 
 import 'ember-views/system/ext';  // for the side effect of extending Ember.run.queues
 
@@ -23,31 +23,10 @@ import VisibilitySupport from 'ember-views/mixins/visibility_support';
 import CompatAttrsProxy from 'ember-views/compat/attrs-proxy';
 import ViewMixin from 'ember-views/mixins/view_support';
 import { deprecateProperty } from 'ember-metal/deprecate_property';
-
 /**
 @module ember
 @submodule ember-views
 */
-
-warn(
-  'The VIEW_PRESERVES_CONTEXT flag has been removed and the functionality can no longer be disabled.',
-  Ember.ENV.VIEW_PRESERVES_CONTEXT !== false,
-  {
-    id: 'ember-views.view-preserves-context-flag',
-    until: '2.0.0'
-  });
-
-/**
-  Global hash of shared templates. This will automatically be populated
-  by the build tools so that you can store your Handlebars templates in
-  separate files that get loaded into JavaScript at buildtime.
-
-  @property TEMPLATES
-  @for Ember
-  @type Object
-  @private
-*/
-Ember.TEMPLATES = {};
 
 /**
   `Ember.View` is the class in Ember responsible for encapsulating templates of
@@ -702,7 +681,8 @@ var View = CoreView.extend(
 
 deprecateProperty(View.prototype, 'currentState', '_currentState', {
   id: 'ember-view.current-state',
-  until: '2.3.0'
+  until: '2.3.0',
+  url: 'http://emberjs.com/deprecations/v2.x/#toc_ember-component-currentstate'
 });
 
 // jscs:enable validateIndentation

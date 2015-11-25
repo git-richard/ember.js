@@ -9,7 +9,6 @@
 
 // using ember-metal/lib/main here to ensure that ember-debug is setup
 // if present
-import Ember from 'ember-metal';
 import { assert, runInDebug } from 'ember-metal/debug';
 import isEnabled from 'ember-metal/features';
 import assign from 'ember-metal/assign';
@@ -18,8 +17,7 @@ import assign from 'ember-metal/assign';
 // We only define this separately so that `Ember.Set` can depend on it.
 import { get } from 'ember-metal/property_get';
 import {
-  guidFor,
-  apply
+  guidFor
 } from 'ember-metal/utils';
 import {
   generateGuid,
@@ -46,7 +44,7 @@ import {
   K
 } from 'ember-metal/core';
 import { validatePropertyInjections } from 'ember-runtime/inject';
-import { symbol } from 'ember-metal/utils';
+import symbol from 'ember-metal/symbol';
 
 export let POST_INIT = symbol('POST_INIT');
 var schedule = run.schedule;
@@ -61,7 +59,7 @@ function makeCtor() {
   // possible.
 
   var wasApplied = false;
-  var initMixins, initProperties;
+  var initProperties;
 
   var Class = function() {
     if (!wasApplied) {
@@ -76,12 +74,6 @@ function makeCtor() {
     var m = meta(this);
     var proto = m.proto;
     m.proto = this;
-    if (initMixins) {
-      // capture locally so we can clear the closed over variable
-      var mixins = initMixins;
-      initMixins = null;
-      apply(this, this.reopen, mixins);
-    }
     if (initProperties) {
       // capture locally so we can clear the closed over variable
       var props = initProperties;
@@ -208,7 +200,7 @@ function makeCtor() {
 
     wasApplied = false;
   };
-  Class._initMixins = function(args) { initMixins = args; };
+
   Class._initProperties = function(args) { initProperties = args; };
 
   Class.proto = function() {
@@ -952,8 +944,8 @@ ClassMixin.apply(CoreObject);
 CoreObject.reopen({
   didDefineProperty(proto, key, value) {
     if (hasCachedComputedProperties === false) { return; }
-    if (value instanceof Ember.ComputedProperty) {
-      var cache = Ember.meta(this.constructor).readableCache();
+    if (value instanceof ComputedProperty) {
+      var cache = meta(this.constructor).readableCache();
 
       if (cache && cache._computedProperties !== undefined) {
         cache._computedProperties = undefined;

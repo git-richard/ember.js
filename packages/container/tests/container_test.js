@@ -1,6 +1,7 @@
 import Ember from 'ember-metal/core';
 import Registry from 'container/registry';
-import { factory } from 'container/tests/container_helper';
+import factory from 'container/tests/test-helpers/factory';
+import { getOwner, OWNER } from 'container/owner';
 import isEnabled from 'ember-metal/features';
 
 var originalModelInjections;
@@ -58,8 +59,6 @@ QUnit.test('A factory returned from lookupFactory has a debugkey', function() {
 
   registry.register('controller:post', PostController);
   var PostFactory = container.lookupFactory('controller:post');
-
-  ok(!PostFactory.container, 'factory instance receives a container');
   equal(PostFactory._debugContainerKey, 'controller:post', 'factory instance receives _debugContainerKey');
 });
 
@@ -77,8 +76,6 @@ QUnit.test('fallback for to create time injections if factory has no extend', fu
 
   var postController = container.lookup('controller:post');
 
-  ok(postController.container, 'instance receives a container');
-  equal(postController.container, container, 'instance receives the correct container');
   equal(postController._debugContainerKey, 'controller:post', 'instance receives _debugContainerKey');
   ok(postController.apple instanceof AppleController, 'instance receives an apple of instance AppleController');
 });
@@ -92,7 +89,6 @@ QUnit.test('The descendants of a factory returned from lookupFactory have a cont
   registry.register('controller:post', PostController);
   instance = container.lookupFactory('controller:post').create();
 
-  ok(instance.container, 'factory instance receives a container');
   equal(instance._debugContainerKey, 'controller:post', 'factory instance receives _debugContainerKey');
 
   ok(instance instanceof PostController, 'factory instance is instance of factory');
@@ -119,18 +115,6 @@ QUnit.test('A registered factory returns a fresh instance if singleton: false is
   ok(postController2 instanceof PostController, 'All instances are instances of the registered factory');
   ok(postController3 instanceof PostController, 'All instances are instances of the registered factory');
   ok(postController4 instanceof PostController, 'All instances are instances of the registered factory');
-});
-
-QUnit.test('A container lookup has access to the container', function() {
-  var registry = new Registry();
-  var container = registry.container();
-  var PostController = factory();
-
-  registry.register('controller:post', PostController);
-
-  var postController = container.lookup('controller:post');
-
-  equal(postController.container, container);
 });
 
 QUnit.test('A factory type with a registered injection\'s instances receive that injection', function() {
@@ -164,10 +148,8 @@ QUnit.test('An individual factory with a registered injection receives the injec
   var postController = container.lookup('controller:post');
   var store = container.lookup('store:main');
 
-  equal(store.container, container);
   equal(store._debugContainerKey, 'store:main');
 
-  equal(postController.container, container);
   equal(postController._debugContainerKey, 'controller:post');
   equal(postController.store, store, 'has the correct store injected');
 });
@@ -537,12 +519,88 @@ QUnit.test('Lazy injection validations are cached', function() {
   container.lookup('apple:main');
 });
 
-if (!isEnabled('ember-registry-container-reform')) {
-  QUnit.test('Container#_registry provides an alias to Container#registry while Container is pseudo-public', function() {
-    var registry = new Registry();
-    var container = registry.container();
+QUnit.test('An object with its owner pre-set should be returned from ownerInjection', function() {
+  let owner = { };
+  var registry = new Registry();
+  var container = registry.container({ owner });
 
-    strictEqual(container.registry, registry, '#registry points to the parent registry');
-    strictEqual(container._registry, registry, '#_registry is an alias to #registry');
+  let result = container.ownerInjection();
+
+  equal(result[OWNER], owner, 'owner is properly included');
+});
+
+if (isEnabled('ember-container-inject-owner')) {
+  QUnit.test('A deprecated `container` property is appended to every object instantiated from an extendable factory', function() {
+    let registry = new Registry();
+    let container = registry.container();
+    let PostController = factory();
+    registry.register('controller:post', PostController);
+    let postController = container.lookup('controller:post');
+
+    expectDeprecation(function() {
+      Ember.get(postController, 'container');
+    }, 'Using the injected `container` is deprecated. Please use the `getOwner` helper instead to access the owner of this object.');
+
+    expectDeprecation(function() {
+      let c = postController.container;
+      strictEqual(c, container);
+    }, 'Using the injected `container` is deprecated. Please use the `getOwner` helper instead to access the owner of this object.');
+  });
+
+  QUnit.test('A deprecated `container` property is appended to every object instantiated from a non-extendable factory, and a fake container is available during instantiation.', function() {
+    expect(8);
+
+    let owner = {};
+    let registry = new Registry();
+    let container = registry.container({ owner });
+
+    // Define a simple non-extendable factory
+    let PostController = function() {};
+    PostController.create = function(options) {
+      ok(options.container, 'fake container has been injected and is available during `create`.');
+
+      expectDeprecation(function() {
+        options.container.lookup('abc:one');
+      }, 'Using the injected `container` is deprecated. Please use the `getOwner` helper to access the owner of this object and then call `lookup` instead.');
+
+      expectDeprecation(function() {
+        options.container.lookupFactory('abc:two');
+      }, 'Using the injected `container` is deprecated. Please use the `getOwner` helper to access the owner of this object and then call `_lookupFactory` instead.');
+
+      // non-deprecated usage of `lookup` and `_lookupFactory`
+      owner.lookup = function(fullName) {
+        equal(fullName, 'abc:one', 'lookup on owner called properly');
+      };
+      owner._lookupFactory = function(fullName) {
+        equal(fullName, 'abc:two', '_lookupFactory on owner called properly');
+      };
+      let foundOwner = getOwner(options);
+      foundOwner.lookup('abc:one');
+      foundOwner._lookupFactory('abc:two');
+
+      return new PostController(options);
+    };
+
+    registry.register('controller:post', PostController);
+    let postController = container.lookup('controller:post');
+
+    expectDeprecation(function() {
+      Ember.get(postController, 'container');
+    }, 'Using the injected `container` is deprecated. Please use the `getOwner` helper instead to access the owner of this object.');
+
+    expectDeprecation(function() {
+      let c = postController.container;
+      strictEqual(c, container, 'Injected container is now regular (not fake) container, but access is still deprecated.');
+    }, 'Using the injected `container` is deprecated. Please use the `getOwner` helper instead to access the owner of this object.');
+  });
+} else {
+  QUnit.test('A `container` property is appended to every instantiated object', function() {
+    let registry = new Registry();
+    let container = registry.container();
+    let PostController = factory();
+    registry.register('controller:post', PostController);
+    let postController = container.lookup('controller:post');
+
+    strictEqual(postController.container, container, '');
   });
 }

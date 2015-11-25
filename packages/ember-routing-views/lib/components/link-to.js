@@ -312,7 +312,7 @@
 @submodule ember-routing-views
 */
 
-import Ember from 'ember-metal/core';
+import Logger from 'ember-metal/logger';
 import { assert, deprecate } from 'ember-metal/debug';
 import { get } from 'ember-metal/property_get';
 import { computed } from 'ember-metal/computed';
@@ -623,24 +623,25 @@ let LinkComponent = EmberComponent.extend({
   _invoke(event) {
     if (!isSimpleClick(event)) { return true; }
 
-    if (this.attrs.preventDefault !== false) {
-      let targetAttribute = this.attrs.target;
+    let preventDefault = get(this, 'preventDefault');
+    let targetAttribute = get(this, 'target');
+
+    if (preventDefault !== false) {
       if (!targetAttribute || targetAttribute === '_self') {
         event.preventDefault();
       }
     }
 
-    if (this.attrs.bubbles === false) { event.stopPropagation(); }
+    if (get(this, 'bubbles') === false) { event.stopPropagation(); }
 
     if (get(this, '_isDisabled')) { return false; }
 
     if (get(this, 'loading')) {
-      Ember.Logger.warn('This link-to is in an inactive loading state because at least one of its parameters presently has a null/undefined value, or the provided route name is invalid.');
+      Logger.warn('This link-to is in an inactive loading state because at least one of its parameters presently has a null/undefined value, or the provided route name is invalid.');
       return false;
     }
 
-    let targetAttribute2 = this.attrs.target;
-    if (targetAttribute2 && targetAttribute2 !== '_self') {
+    if (targetAttribute && targetAttribute !== '_self') {
       return false;
     }
 
@@ -648,7 +649,7 @@ let LinkComponent = EmberComponent.extend({
     let qualifiedRouteName = get(this, 'qualifiedRouteName');
     let models = get(this, 'models');
     let queryParamValues = get(this, 'queryParams.values');
-    let shouldReplace = get(this, 'attrs.replace');
+    let shouldReplace = get(this, 'replace');
 
     routing.transitionTo(qualifiedRouteName, models, queryParamValues, shouldReplace);
   },
@@ -656,7 +657,7 @@ let LinkComponent = EmberComponent.extend({
   queryParams: null,
 
   qualifiedRouteName: computed('targetRouteName', '_routing.currentState', function computeLinkToComponentQualifiedRouteName() {
-    let params = this.attrs.params.slice();
+    let params = get(this, 'params').slice();
     let lastParam = params[params.length - 1];
     if (lastParam && lastParam.isQueryParams) {
       params.pop();
@@ -724,6 +725,29 @@ let LinkComponent = EmberComponent.extend({
     return true;
   }),
 
+  _getModels(params) {
+    let modelCount = params.length - 1;
+    let models = new Array(modelCount);
+
+    for (let i = 0; i < modelCount; i++) {
+      let value = params[i + 1];
+
+      while (ControllerMixin.detect(value)) {
+        deprecate(
+          'Providing `{{link-to}}` with a param that is wrapped in a controller is deprecated. ' +
+            (this.parentView ? 'Please update `' + this.parentView + '` to use `{{link-to "post" someController.model}}` instead.' : ''),
+          false,
+          { id: 'ember-routing-views.controller-wrapped-param', until: '3.0.0' }
+        );
+        value = value.get('model');
+      }
+
+      models[i] = value;
+    }
+
+    return models;
+  },
+
   /**
     The default href value to use while a link-to is loading.
     Only applies when tagName is 'a'
@@ -738,15 +762,14 @@ let LinkComponent = EmberComponent.extend({
   willRender() {
     let queryParams;
 
-    let attrs = this.attrs;
-
     // Do not mutate params in place
-    let params = attrs.params.slice();
+    let params = get(this, 'params').slice();
 
     assert('You must provide one or more parameters to the link-to component.', params.length);
 
-    if (attrs.disabledWhen) {
-      this.set('disabled', attrs.disabledWhen);
+    let disabledWhen = get(this, 'disabledWhen');
+    if (disabledWhen) {
+      this.set('disabled', disabledWhen);
     }
 
     // Process the positional arguments, in order.
@@ -769,25 +792,11 @@ let LinkComponent = EmberComponent.extend({
     this.set('queryParams', queryParams);
 
     // 4. Any remaining indices (excepting `targetRouteName` at 0) are `models`.
-    let models = [];
-
-    for (let i = 1; i < params.length; i++) {
-      let value = params[i];
-
-      while (ControllerMixin.detect(value)) {
-        deprecate(
-          'Providing `{{link-to}}` with a param that is wrapped in a controller is deprecated. ' +
-            (this.parentView ? 'Please update `' + this.parentView + '` to use `{{link-to "post" someController.model}}` instead.' : ''),
-          false,
-          { id: 'ember-routing-views.controller-wrapped-param', until: '3.0.0' }
-        );
-        value = value.get('model');
-      }
-
-      models.push(value);
+    if (params.length > 1) {
+      this.set('models', this._getModels(params));
+    } else {
+      this.set('models', []);
     }
-
-    this.set('models', models);
   }
 });
 
